@@ -1,0 +1,141 @@
+/**
+ * Core data model for the RFP Analyzer.
+ *
+ * Conventions:
+ * - All money is USD. PSF = "per square foot".
+ * - All rates are decimals: 0.03 = 3%, NOT 3.
+ * - All durations are months unless suffixed (e.g. annualRatePSF).
+ * - Negative numbers in cash-flow rows mean money OUT (concessions, LC, TI).
+ */
+
+export type LCStructure = "upfront" | "split50";
+//  upfront — full LC paid in month 1
+//  split50 — 50% in month 1, 50% at rent commencement (after free rent)
+
+export interface Globals {
+  /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
+  discountRate: number;
+  /** Leasing commission rate on rent, decimal (0.09 = 9%). */
+  lcPercent: number;
+  /** Building shell cost PSF, $ — replaces the Excel hardcoded $140. */
+  shellCostPSF: number;
+  /** How LC payments are timed. */
+  lcStructure: LCStructure;
+  /** Default lease horizon in months. Used when a scenario's term is shorter. */
+  horizonMonths: number;
+}
+
+export interface ScenarioInputs {
+  /** Display name (e.g. "UW", "Counter v1"). */
+  name: string;
+
+  // SF block
+  projectSF: number;
+  buildingSF: number;
+  proposedLeaseSF: number;
+
+  // Rent block
+  /** Annual base rent PSF in year 1, $. */
+  baseRatePSF: number;
+  /** Annual escalation, decimal (0.03 = 3%). */
+  escalation: number;
+
+  // Concessions
+  /** TI allowance PSF, $. */
+  tiAllowancePSF: number;
+  /** Free rent in months. */
+  freeRentMonths: number;
+
+  // Term
+  /** Total lease term in months, INCLUDING free-rent period. */
+  leaseTermMonths: number;
+  /** ISO date string (YYYY-MM-DD) for lease commencement. */
+  leaseCommencement: string;
+}
+
+/** One row of the year-by-year rent schedule. */
+export interface AnnualScheduleRow {
+  /** 0 = free-rent row, 1 = year 1, 2 = year 2, ... */
+  year: number;
+  /** Annual rate PSF for that year, $. 0 for the free-rent row. */
+  annualRatePSF: number;
+  /** How many months of the term fall into this year (0-12). */
+  monthsActive: number;
+}
+
+/** One row of the month-by-month cash flow grid (all values PSF). */
+export interface MonthlyGridRow {
+  /** 1-indexed month number from lease commencement. */
+  month: number;
+  /** ISO date string for this month. */
+  date: string;
+  baseRentPSF: number;
+  /** Negative offset to base rent during free-rent period. */
+  freeRentPSF: number;
+  /** Negative — TI allowance, paid in month 1. */
+  tiPSF: number;
+  /** Negative — leasing commission, timing depends on lcStructure. */
+  lcPSF: number;
+  /** Sum of the four columns above. */
+  netCFPSF: number;
+}
+
+/** PSF totals over the term — feeds the NER waterfall chart. */
+export interface WaterfallComponents {
+  baseRent: number;
+  freeRent: number;     // negative
+  ti: number;           // negative
+  lc: number;           // negative
+  netCashFlow: number;  // sum of the four
+}
+
+export interface ScenarioResults {
+  schedule: AnnualScheduleRow[];
+  grid: MonthlyGridRow[];
+
+  /** Headline metric: undiscounted annual NER PSF, $. */
+  undiscountedNER: number;
+  /** Headline metric: discounted annual NER PSF, $. */
+  discountedNER: number;
+
+  /** Year-1 base rate ÷ building cost PSF, decimal. */
+  yocYr1: number;
+  /** Avg rate over term ÷ building cost PSF, decimal. */
+  yocTerm: number;
+
+  /** shellCostPSF + tiAllowancePSF + lcPSF, $. */
+  buildingCostPSF: number;
+
+  /** PSF — feeds the waterfall. */
+  waterfall: WaterfallComponents;
+
+  /** Convenience: PSF totals (mostly for UI). */
+  totals: {
+    lcPSF: number;
+    /** Free rent value, expressed as a positive $ (concession value). */
+    freeRentValuePSF: number;
+    tiPSF: number;
+    /** Weighted-average annual rate over term, $. */
+    avgRatePSF: number;
+  };
+
+  /** Convenience: absolute $ totals (= PSF × proposedLeaseSF). */
+  totalsAbsolute: {
+    lc: number;
+    freeRentValue: number;
+    ti: number;
+  };
+}
+
+/** The full app state — what gets persisted to localStorage. */
+export interface AppState {
+  property: {
+    name: string;
+  };
+  globals: Globals;
+  scenarios: Array<{ id: string; inputs: ScenarioInputs }>;
+  comparison: {
+    aId: string;
+    bId: string;
+  };
+}
