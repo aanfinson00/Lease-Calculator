@@ -1,0 +1,55 @@
+/**
+ * Display formatters. Pure functions; easy to test.
+ *
+ * Convention: every formatter accepts NaN/null/undefined and returns "—".
+ * That way UI code can pass raw values without guarding.
+ */
+
+const isNotFinite = (v: unknown): boolean =>
+  v == null || typeof v !== "number" || !Number.isFinite(v);
+
+/** $1,234.56 */
+export function fmtCurrency(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  return (v as number).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+}
+
+/** $7.34 PSF */
+export function fmtPSF(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  return `${fmtCurrency(v, fractionDigits)} PSF`;
+}
+
+/** 8.00% */
+export function fmtPercent(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  return `${((v as number) * 100).toFixed(fractionDigits)}%`;
+}
+
+/** 300,000 SF */
+export function fmtSF(v: number | null | undefined): string {
+  if (isNotFinite(v)) return "—";
+  return `${(v as number).toLocaleString("en-US")} SF`;
+}
+
+/** Difference with sign: "+1.23", "-0.45", "0.00". */
+export function fmtDelta(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  const n = v as number;
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(fractionDigits)}`;
+}
+
+/** Plain number with locale separators. */
+export function fmtNumber(v: number | null | undefined, fractionDigits = 0): string {
+  if (isNotFinite(v)) return "—";
+  return (v as number).toLocaleString("en-US", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+}
