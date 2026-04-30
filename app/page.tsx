@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { GlobalsPanel } from "@/components/globals-panel";
 import { InputsPanel } from "@/components/inputs-panel";
+import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
 import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
@@ -43,7 +44,10 @@ export default function Home() {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
       <header className="flex flex-col gap-4">
-        <PropertyHeader />
+        <div className="flex items-end justify-between gap-4">
+          <div className="flex-1"><PropertyHeader /></div>
+          <ExportPdfButton />
+        </div>
         <ScenarioBar />
       </header>
 
