@@ -1,0 +1,16 @@
+{
+  "name": "lease-calculator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RFP Analyzer — industrial lease NER comparison tool",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "typescript": "^5.4.5",
+    "vitest": "^1.5.0"
+  }
+}
