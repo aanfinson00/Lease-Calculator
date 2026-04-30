@@ -19,9 +19,13 @@ alone, and close it when you're done.
 Double-click **`start.bat`**. The app will open in your default browser.
 A console window will stay open while the app is running.
 
-> If Windows says "Python not found," install Python 3 from
-> [python.org](https://www.python.org/downloads/) (it's free, takes a minute,
-> and is widely used). Reopen `start.bat` after install.
+The launcher uses Python if installed; otherwise it falls back to
+PowerShell, which is built into every Windows 10/11 machine. Either path
+works — you don't need to install anything.
+
+> If your IT department has locked PowerShell execution policy, you may
+> need to right-click `start.bat` → Properties → check "Unblock" before
+> running it the first time.
 
 ### Linux / advanced
 From this folder, run:

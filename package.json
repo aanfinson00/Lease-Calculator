@@ -8,7 +8,7 @@
     "start": "next start",
     "test": "vitest",
     "test:run": "vitest run",
-    "package": "rm -rf out rfp-analyzer.zip && next build && cp scripts/start.command out/ && chmod +x out/start.command && cp scripts/start.bat out/ && cp scripts/README-DIST.md out/README.md && (cd out && zip -qr ../rfp-analyzer.zip .) && echo 'Built rfp-analyzer.zip'"
+    "package": "rm -rf out rfp-analyzer.zip && next build && cp scripts/start.command out/ && chmod +x out/start.command && cp scripts/start.bat out/ && cp scripts/start.ps1 out/ && cp scripts/README-DIST.md out/README.md && (cd out && zip -qr ../rfp-analyzer.zip .) && echo 'Built rfp-analyzer.zip'"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
