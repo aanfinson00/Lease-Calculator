@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RFP Analyzer
 
-## Getting Started
+A web app for comparing industrial lease proposals on a Net Effective Rent
+(NER) basis. Built as a side-by-side replacement for the Excel workbook in
+`RFP_Analysis_Spec.md`, with the bugs fixed and N-scenario support.
 
-First, run the development server:
+100% client-side: no backend, no database, no analytics. Inputs persist to
+the browser's `localStorage`.
+
+## Develop
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
+npm test             # 60+ unit tests (Vitest)
+npm run test:run     # one-shot test run
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Code layout:
+```
+app/        Next.js App Router — layout, page, globals.css
+components/ React components (ui/ = shadcn-style primitives)
+lib/        types.ts, calc.ts, solver.ts, store.ts, format.ts, utils.ts
+scripts/    distribution launcher scripts (Mac + Windows)
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Distribute (the offline ZIP for coworkers)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run package
+```
 
-## Learn More
+This produces **`rfp-analyzer.zip`** (~1MB). Email it to a coworker; they
+unzip and double-click `start.command` (Mac) or `start.bat` (Windows). The
+app runs entirely in their browser — no internet, no central URL, no risk
+of leaking deal data.
 
-To learn more about Next.js, take a look at the following resources:
+The ZIP contents:
+```
+rfp-analyzer/
+├── start.command       Mac launcher (double-click)
+├── start.bat           Windows launcher (double-click)
+├── README.md           User-facing instructions
+├── index.html          Static export
+└── _next/, *.svg, ...  bundled JS/CSS/assets
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy (Vercel)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Static export is on by default (`output: "export"` in `next.config.ts`).
+Vercel will pick this up automatically. To deploy a normal Vercel app
+instead, remove `output: "export"` from `next.config.ts` first.
 
-## Deploy on Vercel
+## Spec
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The original Excel workbook spec lives in `RFP_Analysis_Spec.md`. The
+calc engine in `lib/calc.ts` rebuilds those formulas with the bugs called
+out in §10 fixed (UW/Proposal symmetry, free-rent valuation, single
+discount-rate variable, dynamic shell cost).

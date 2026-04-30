@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# distribution artifact
+/rfp-analyzer.zip
+
 # production
 /build
 
