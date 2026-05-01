@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAppStore } from "@/lib/store";
-import type { LCCalculation, LCStructure, ScenarioInputs } from "@/lib/types";
+import type { ScenarioInputs } from "@/lib/types";
 
 interface FieldDef {
   /** Required for editable fields; omitted for derived (computed) fields. */
@@ -21,6 +21,8 @@ interface FieldDef {
   compute?: (inputs: ScenarioInputs) => number;
   /** How to render the computed value. */
   computeFormat?: "percent" | "currency" | "number";
+  /** When set, the cell renders a horizontal radio group with these options. */
+  radio?: { value: string; label: string }[];
 }
 
 interface SectionDef {
@@ -62,6 +64,22 @@ const SECTIONS: SectionDef[] = [
         label: "Combined (%)",
         compute: (i) => (i.lcLLRepPercent + i.lcTenantRepPercent) * 100,
         computeFormat: "percent",
+      },
+      {
+        field: "lcCalculation",
+        label: "Calc",
+        radio: [
+          { value: "tiered", label: "Tiered" },
+          { value: "flat", label: "Flat" },
+        ],
+      },
+      {
+        field: "lcStructure",
+        label: "Payment",
+        radio: [
+          { value: "split50", label: "50/50" },
+          { value: "upfront", label: "Upfront" },
+        ],
       },
     ],
   },
@@ -130,7 +148,7 @@ function DealAssumptions() {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
         Deal Assumptions · shared
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         <Stack label="Shell ($/SF)">
           <Input
             type="number"
@@ -148,34 +166,6 @@ function DealAssumptions() {
             value={(globals.discountRate * 100).toFixed(2)}
             onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
           />
-        </Stack>
-        <Stack label="LC Calc">
-          <RadioGroup
-            value={globals.lcCalculation}
-            onValueChange={(v) => update({ lcCalculation: v as LCCalculation })}
-            className="flex h-8 items-center gap-3"
-          >
-            <label className="flex items-center gap-1 text-sm" title="Full % yrs 1-5, half % yrs 6+">
-              <RadioGroupItem value="tiered" /> Tiered
-            </label>
-            <label className="flex items-center gap-1 text-sm" title="Full % every year">
-              <RadioGroupItem value="flat" /> Flat
-            </label>
-          </RadioGroup>
-        </Stack>
-        <Stack label="LC Payment">
-          <RadioGroup
-            value={globals.lcStructure}
-            onValueChange={(v) => update({ lcStructure: v as LCStructure })}
-            className="flex h-8 items-center gap-3"
-          >
-            <label className="flex items-center gap-1 text-sm">
-              <RadioGroupItem value="split50" /> 50/50
-            </label>
-            <label className="flex items-center gap-1 text-sm">
-              <RadioGroupItem value="upfront" /> Upfront
-            </label>
-          </RadioGroup>
         </Stack>
       </div>
     </div>
@@ -273,6 +263,25 @@ function Cell({ field, scenarioId, inputs }: CellProps) {
       <div className="flex h-8 items-center px-2 text-sm tabular-nums text-[var(--color-muted-foreground)]">
         {text}
       </div>
+    );
+  }
+
+  // Radio group cell — horizontal options, e.g. Tiered/Flat.
+  if (field.radio && field.field) {
+    const key = field.field;
+    const current = String(inputs[key] ?? "");
+    return (
+      <RadioGroup
+        value={current}
+        onValueChange={(v) => updateInput(scenarioId, key, v as never)}
+        className="flex h-8 items-center gap-3"
+      >
+        {field.radio.map((opt) => (
+          <label key={opt.value} className="flex items-center gap-1 text-xs">
+            <RadioGroupItem value={opt.value} /> {opt.label}
+          </label>
+        ))}
+      </RadioGroup>
     );
   }
 

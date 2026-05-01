@@ -6,8 +6,6 @@ import type { Globals, ScenarioInputs } from "./types";
 const baseGlobals: Globals = {
   discountRate: 0.08,
   shellCostPSF: 140,
-  lcStructure: "upfront",
-  lcCalculation: "tiered",
   horizonMonths: 204,
 };
 
@@ -20,6 +18,8 @@ const baseInputs: ScenarioInputs = {
   escalation: 0.04,
   lcLLRepPercent: 0.045,
   lcTenantRepPercent: 0.045,
+  lcCalculation: "tiered",
+  lcStructure: "upfront",
   tiAllowancePSF: 10,
   freeRentMonths: 6,
   leaseTermMonths: 130,

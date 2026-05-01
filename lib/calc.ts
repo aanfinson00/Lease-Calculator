@@ -182,8 +182,8 @@ export function buildMonthlyGrid(
 
   // LC payment timing — half at execution (m=1), half at rent commencement
   // when split50; the full amount at execution when upfront.
-  const lcAtExecution = globals.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
-  const lcAtRC = globals.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
+  const lcAtExecution = inputs.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
+  const lcAtRC = inputs.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
   // 1-indexed month (from execution) where rent collection first kicks in.
   // Front-loaded free rent (start === 1, free > 0) pushes rent commencement
   // out by `free` months; a mid-term abatement leaves rent starting at the
@@ -332,7 +332,7 @@ export function runScenario(
 ): ScenarioResults {
   const schedule = buildAnnualSchedule(inputs);
   const totalLCPercent = inputs.lcLLRepPercent + inputs.lcTenantRepPercent;
-  const lcPSF = calcLC(schedule, totalLCPercent, globals.lcCalculation);
+  const lcPSF = calcLC(schedule, totalLCPercent, inputs.lcCalculation);
   const grid = buildMonthlyGrid(inputs, globals, schedule, lcPSF);
   const term = inputs.leaseTermMonths;
 

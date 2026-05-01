@@ -25,8 +25,6 @@ function resetStore() {
     globals: {
       discountRate: 0.08,
       shellCostPSF: 140,
-      lcStructure: "split50",
-      lcCalculation: "tiered",
       horizonMonths: 204,
     },
     deals: [],
@@ -111,7 +109,6 @@ describe("useAppStore — input updates", () => {
     const g = useAppStore.getState().globals;
     expect(g.discountRate).toBe(0.1);
     expect(g.shellCostPSF).toBe(140); // unchanged
-    expect(g.lcStructure).toBe("split50"); // unchanged
   });
 
   it("setPropertyName works", () => {

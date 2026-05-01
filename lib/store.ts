@@ -30,8 +30,6 @@ import type { FreeVariable } from "./solver";
 const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
   shellCostPSF: 140,
-  lcStructure: "split50",
-  lcCalculation: "tiered",
   horizonMonths: 204,
 };
 
@@ -47,6 +45,8 @@ const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): Scena
     escalation: 0.03,
     lcLLRepPercent: 0.045,
     lcTenantRepPercent: 0.045,
+    lcCalculation: "tiered",
+    lcStructure: "split50",
     tiAllowancePSF: 5,
     freeRentMonths: 4,
     leaseTermMonths: 125,
@@ -242,7 +242,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 10,
+      version: 11,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -269,6 +269,9 @@ export const useAppStore = create<AppStore>()(
       // v9 → v10: lift globals.lcLLRepPercent + lcTenantRepPercent into each
       //           scenario's inputs. Different deals may have different
       //           commission structures (e.g. a direct-to-LL deal with no TR).
+      // v10 → v11: lift globals.lcStructure + lcCalculation into each
+      //            scenario's inputs as well. Different deals can have
+      //            different calc methods and payment timings.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -285,11 +288,11 @@ export const useAppStore = create<AppStore>()(
           }));
         }
         if (state && version < 3 && state.globals) {
-          state.globals = {
-            ...state.globals,
-            lcCalculation:
-              (state.globals as Partial<Globals>).lcCalculation ?? "tiered",
-          };
+          // Adds lcCalculation to a now-deprecated globals shape; v11 moves
+          // it onto inputs. Loosen typing since the current Globals type no
+          // longer includes the field.
+          const g = state.globals as unknown as Record<string, unknown>;
+          if (typeof g.lcCalculation !== "string") g.lcCalculation = "tiered";
         }
         if (state && version < 5 && state.scenarios) {
           state.scenarios = state.scenarios.map((sc) => ({
@@ -332,12 +335,9 @@ export const useAppStore = create<AppStore>()(
           });
         }
         if (state && version < 10 && state.scenarios && state.globals) {
-          const oldGlobals = state.globals as Globals & {
-            lcLLRepPercent?: number;
-            lcTenantRepPercent?: number;
-          };
-          const llRep = oldGlobals.lcLLRepPercent ?? 0.045;
-          const trRep = oldGlobals.lcTenantRepPercent ?? 0.045;
+          const g = state.globals as unknown as Record<string, unknown>;
+          const llRep = typeof g.lcLLRepPercent === "number" ? g.lcLLRepPercent : 0.045;
+          const trRep = typeof g.lcTenantRepPercent === "number" ? g.lcTenantRepPercent : 0.045;
           state.scenarios = state.scenarios.map((sc) => ({
             ...sc,
             inputs: {
@@ -348,8 +348,31 @@ export const useAppStore = create<AppStore>()(
                 (sc.inputs as Partial<ScenarioInputs>).lcTenantRepPercent ?? trRep,
             },
           }));
-          delete (state.globals as { lcLLRepPercent?: number }).lcLLRepPercent;
-          delete (state.globals as { lcTenantRepPercent?: number }).lcTenantRepPercent;
+          delete g.lcLLRepPercent;
+          delete g.lcTenantRepPercent;
+        }
+        if (state && version < 11 && state.scenarios && state.globals) {
+          const g = state.globals as unknown as Record<string, unknown>;
+          const calc =
+            g.lcCalculation === "flat" || g.lcCalculation === "tiered"
+              ? (g.lcCalculation as "flat" | "tiered")
+              : "tiered";
+          const struct =
+            g.lcStructure === "upfront" || g.lcStructure === "split50"
+              ? (g.lcStructure as "upfront" | "split50")
+              : "split50";
+          state.scenarios = state.scenarios.map((sc) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              lcCalculation:
+                (sc.inputs as Partial<ScenarioInputs>).lcCalculation ?? calc,
+              lcStructure:
+                (sc.inputs as Partial<ScenarioInputs>).lcStructure ?? struct,
+            },
+          }));
+          delete g.lcCalculation;
+          delete g.lcStructure;
         }
         return state as unknown as PersistedState;
       },

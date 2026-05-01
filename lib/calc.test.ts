@@ -14,8 +14,6 @@ import type { Globals, ScenarioInputs } from "./types";
 const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   discountRate: 0.08,
   shellCostPSF: 140,
-  lcStructure: "upfront",
-  lcCalculation: "tiered",
   horizonMonths: 204,
   ...overrides,
 });
@@ -32,6 +30,8 @@ const proposalInputs: ScenarioInputs = {
   escalation: 0.04,
   lcLLRepPercent: 0.045,
   lcTenantRepPercent: 0.045,
+  lcCalculation: "tiered",
+  lcStructure: "upfront",
   tiAllowancePSF: 10,
   freeRentMonths: 6,
   leaseTermMonths: 130,
@@ -51,6 +51,8 @@ const uwInputs: ScenarioInputs = {
   escalation: 0.03,
   lcLLRepPercent: 0.045,
   lcTenantRepPercent: 0.045,
+  lcCalculation: "tiered",
+  lcStructure: "upfront",
   tiAllowancePSF: 5,
   freeRentMonths: 4,
   leaseTermMonths: 125,
@@ -288,13 +290,13 @@ describe("runScenario — Proposal (spec §12)", () => {
 
 describe("runScenario — LC structure variants", () => {
   it("100% upfront puts entire LC in month 1", () => {
-    const r = runScenario(proposalInputs, makeGlobals({ lcStructure: "upfront" }));
+    const r = runScenario({ ...proposalInputs, lcStructure: "upfront" }, makeGlobals());
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
     expect(r.grid[1].lcPSF).toBe(0);
   });
 
   it("50/50 split puts half in month 1, half at rent commencement", () => {
-    const r = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const r = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
     const half = -r.totals.lcPSF / 2;
     expect(r.grid[0].lcPSF).toBeCloseTo(half, 6); // month 1
     // free=6 → rent commencement is month 7 → grid index 6
@@ -303,22 +305,22 @@ describe("runScenario — LC structure variants", () => {
 
   it("50/50 with no free rent collapses to month 1", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentMonths: 0 },
-      makeGlobals({ lcStructure: "split50" }),
+      { ...proposalInputs, freeRentMonths: 0, lcStructure: "split50" },
+      makeGlobals(),
     );
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
     expect(r.grid[1].lcPSF).toBe(0);
   });
 
   it("undiscounted NER is the same regardless of LC timing (only timing differs, not total)", () => {
-    const a = runScenario(proposalInputs, makeGlobals({ lcStructure: "upfront" }));
-    const b = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const a = runScenario({ ...proposalInputs, lcStructure: "upfront" }, makeGlobals());
+    const b = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
     expect(a.undiscountedNER).toBeCloseTo(b.undiscountedNER, 6);
   });
 
   it("discounted NER is HIGHER for split50 (deferred LC = less discount cost)", () => {
-    const a = runScenario(proposalInputs, makeGlobals({ lcStructure: "upfront" }));
-    const b = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const a = runScenario({ ...proposalInputs, lcStructure: "upfront" }, makeGlobals());
+    const b = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
     expect(b.discountedNER).toBeGreaterThan(a.discountedNER);
   });
 });
@@ -407,7 +409,7 @@ describe("calcUndiscountedNER / calcDiscountedNER", () => {
 
 describe("lease execution date — commission split timing", () => {
   it("execution === commencement preserves original split50 timing (half M1, half at RC)", () => {
-    const r = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const r = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
     const half = -r.totals.lcPSF / 2;
     expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
     expect(r.grid[6].lcPSF).toBeCloseTo(half, 6); // free=6 → RC at month 7
@@ -417,8 +419,13 @@ describe("lease execution date — commission split timing", () => {
     // 3-month lead time; free=6. Half at execution (M1). Half at rent comm
     // (M = offset + free + 1 = 3 + 6 + 1 = 10, grid index 9).
     const r = runScenario(
-      { ...proposalInputs, leaseExecutionDate: "2024-10-01", leaseCommencement: "2025-01-01" },
-      makeGlobals({ lcStructure: "split50" }),
+      {
+        ...proposalInputs,
+        leaseExecutionDate: "2024-10-01",
+        leaseCommencement: "2025-01-01",
+        lcStructure: "split50",
+      },
+      makeGlobals(),
     );
     const half = -r.totals.lcPSF / 2;
     expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
@@ -426,10 +433,15 @@ describe("lease execution date — commission split timing", () => {
   });
 
   it("execution before commencement → discounted NER is LOWER than execution = commencement (later cash inflows discounted more)", () => {
-    const sameDay = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const sameDay = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
     const earlySign = runScenario(
-      { ...proposalInputs, leaseExecutionDate: "2024-07-01", leaseCommencement: "2025-01-01" },
-      makeGlobals({ lcStructure: "split50" }),
+      {
+        ...proposalInputs,
+        leaseExecutionDate: "2024-07-01",
+        leaseCommencement: "2025-01-01",
+        lcStructure: "split50",
+      },
+      makeGlobals(),
     );
     expect(earlySign.discountedNER).toBeLessThan(sameDay.discountedNER);
   });
@@ -477,8 +489,8 @@ describe("free rent start month — mid-term abatements", () => {
 
   it("front-loaded abatement: LC half lands at rent commencement (after free months)", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 1 },
-      makeGlobals({ lcStructure: "split50" }),
+      { ...proposalInputs, freeRentStartMonth: 1, lcStructure: "split50" },
+      makeGlobals(),
     );
     const half = -r.totals.lcPSF / 2;
     expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
@@ -488,8 +500,8 @@ describe("free rent start month — mid-term abatements", () => {
 
   it("mid-term abatement: rent starts at lease commencement → both LC halves collapse to M1 (when execution=commencement)", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 13 },
-      makeGlobals({ lcStructure: "split50" }),
+      { ...proposalInputs, freeRentStartMonth: 13, lcStructure: "split50" },
+      makeGlobals(),
     );
     // Both halves at month 1 (rcMonth === 1 because execution=commencement and no front-load)
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
@@ -504,8 +516,9 @@ describe("free rent start month — mid-term abatements", () => {
         leaseExecutionDate: "2024-10-01",
         leaseCommencement: "2025-01-01",
         freeRentStartMonth: 13, // mid-term abatement
+        lcStructure: "split50",
       },
-      makeGlobals({ lcStructure: "split50" }),
+      makeGlobals(),
     );
     const half = -r.totals.lcPSF / 2;
     // Half 1 at execution (M1 of grid)

@@ -21,10 +21,6 @@ export interface Globals {
   discountRate: number;
   /** Building shell cost PSF, $ — replaces the Excel hardcoded $140. */
   shellCostPSF: number;
-  /** How LC payments are timed (firm-wide convention). */
-  lcStructure: LCStructure;
-  /** How LC totals are calculated against the rent schedule (firm-wide convention). */
-  lcCalculation: LCCalculation;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
 }
@@ -66,6 +62,10 @@ export interface ScenarioInputs {
   lcLLRepPercent: number;
   /** Tenant-rep brokerage commission rate, decimal. Per scenario. */
   lcTenantRepPercent: number;
+  /** How LC totals are calculated against the rent schedule (per scenario). */
+  lcCalculation: LCCalculation;
+  /** How LC payments are timed (per scenario). */
+  lcStructure: LCStructure;
 
   // Concessions
   /** TI allowance PSF, $. */
