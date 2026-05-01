@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Database, Search, X } from "lucide-react";
+import { Database, Search, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { loadDeals, dealAsScenarioPatch, dealLCSplit, type Deal } from "@/lib/deals";
+import { dealAsScenarioPatch, dealLCSplit, parseDeals, type Deal } from "@/lib/deals";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 /**
- * Searchable popover for picking a deal from public/deals.csv. Click the
- * trigger to open; type to filter across code / deal name / tenant name.
- * Arrow keys + Enter to select. Selection writes the deal's fields onto
- * the target scenario and updates globals.lc{LL,Tenant}RepPercent with a
- * 50/50 split of the deal's LC% (Override > 0 wins over LCs).
+ * Searchable popover for picking an uploaded deal CSV. The user uploads a
+ * CSV from their machine (FileReader → parseDeals → store.setDeals); deals
+ * persist in this browser's localStorage and are never sent to the server.
+ *
+ * States:
+ *   - empty (no deals loaded) → upload prompt
+ *   - loaded → search input + filtered list, with replace/clear footer
+ *
+ * Selecting a deal writes the patch onto the target scenario and updates
+ * globals.lc{LL,Tenant}RepPercent with a 50/50 split of the deal's LC%.
  */
 interface Props {
   scenarioId: string;
@@ -32,38 +37,25 @@ export function DealPicker({
   title = "Load from deal CSV",
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const deals = useAppStore((s) => s.deals);
+  const setDeals = useAppStore((s) => s.setDeals);
+  const clearDeals = useAppStore((s) => s.clearDeals);
   const updateInput = useAppStore((s) => s.updateInput);
   const updateGlobals = useAppStore((s) => s.updateGlobals);
 
-  // Lazy-load the CSV the first time the picker opens — saves a fetch on
-  // initial page load if the user never opens the picker.
+  // Focus search on open (only when deals are already loaded).
   useEffect(() => {
-    if (!open || deals.length > 0) return;
-    let cancelled = false;
-    loadDeals()
-      .then((d) => {
-        if (!cancelled) setDeals(d);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (open && deals.length > 0) inputRef.current?.focus();
   }, [open, deals.length]);
-
-  // Focus the search input on open.
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
 
   // Click-outside to close.
   useEffect(() => {
@@ -89,7 +81,6 @@ export function DealPicker({
     );
   }, [deals, query]);
 
-  // Keep activeIndex in range as the filter changes.
   useEffect(() => {
     setActiveIndex(0);
   }, [query]);
@@ -102,6 +93,34 @@ export function DealPicker({
     updateGlobals(dealLCSplit(deal));
     setOpen(false);
     setQuery("");
+  };
+
+  const handleFile = (file: File) => {
+    setParseError(null);
+    const reader = new FileReader();
+    reader.onerror = () => setParseError("Couldn't read the file.");
+    reader.onload = () => {
+      try {
+        const text = String(reader.result ?? "");
+        const parsed = parseDeals(text);
+        if (parsed.length === 0) {
+          setParseError("No deal rows found in the file.");
+          return;
+        }
+        setDeals(parsed);
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : String(e));
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleFile(file);
+    // Reset the file input so re-uploading the same file fires onChange again.
+    e.target.value = "";
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -138,6 +157,15 @@ export function DealPicker({
         {variant === "icon" ? <Database /> : "Load deal…"}
       </button>
 
+      {/* Hidden file input — opened programmatically from the upload buttons */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={onFileChange}
+      />
+
       {open && (
         <div
           ref={popoverRef}
@@ -148,84 +176,140 @@ export function DealPicker({
           role="dialog"
           aria-label="Pick a deal to load"
         >
-          <div className="flex items-center gap-1 rounded-md border px-2">
-            <Search className="size-4 text-[var(--color-muted-foreground)]" />
-            <Input
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="Search code, deal, or tenant…"
-              className="h-9 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+          {deals.length === 0 ? (
+            <UploadPrompt
+              onClick={() => fileInputRef.current?.click()}
+              error={parseError}
             />
-            {query && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                aria-label="Clear search"
-                onClick={() => {
-                  setQuery("");
-                  inputRef.current?.focus();
-                }}
-              >
-                <X />
-              </Button>
-            )}
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 rounded-md border px-2">
+                <Search className="size-4 text-[var(--color-muted-foreground)]" />
+                <Input
+                  ref={inputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="Search code, deal, or tenant…"
+                  className="h-9 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                />
+                {query && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setQuery("");
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    <X />
+                  </Button>
+                )}
+              </div>
 
-          {error && (
-            <div className="px-2 py-3 text-xs text-[var(--color-destructive)]">{error}</div>
+              {parseError && (
+                <div className="px-2 py-2 text-xs text-[var(--color-destructive)]">
+                  {parseError}
+                </div>
+              )}
+
+              {filtered.length === 0 ? (
+                <div className="px-2 py-3 text-xs text-[var(--color-muted-foreground)]">
+                  No deals match "{query}".
+                </div>
+              ) : (
+                <ul className="mt-1 max-h-72 overflow-y-auto" role="listbox">
+                  {filtered.map((d, i) => (
+                    <li
+                      key={d.code}
+                      role="option"
+                      aria-selected={i === activeIndex}
+                      className={cn(
+                        "flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm",
+                        i === activeIndex
+                          ? "bg-[var(--color-accent)]"
+                          : "hover:bg-[var(--color-muted)]",
+                      )}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onClick={() => apply(d)}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium">{d.code}</span>
+                        <StatusChip status={d.status} />
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2 text-xs text-[var(--color-muted-foreground)]">
+                        <span className="truncate">
+                          {d.dealName} · {d.tenantName}
+                        </span>
+                        <span className="tabular-nums whitespace-nowrap">
+                          {d.leaseSF.toLocaleString("en-US")} SF
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-1 flex items-center justify-between border-t px-2 pt-1.5 text-[10px] text-[var(--color-muted-foreground)]">
+                <span>↑↓ navigate · ⏎ select · esc close</span>
+                <span className="flex items-center gap-2">
+                  <span>{deals.length} loaded</span>
+                  <button
+                    type="button"
+                    className="font-medium text-[var(--color-primary)] hover:underline"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    className="font-medium text-[var(--color-destructive)] hover:underline"
+                    onClick={() => {
+                      clearDeals();
+                      setQuery("");
+                      setParseError(null);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </span>
+              </div>
+            </>
           )}
-
-          {!error && deals.length === 0 && (
-            <div className="px-2 py-3 text-xs text-[var(--color-muted-foreground)]">Loading…</div>
-          )}
-
-          {!error && deals.length > 0 && filtered.length === 0 && (
-            <div className="px-2 py-3 text-xs text-[var(--color-muted-foreground)]">
-              No deals match "{query}".
-            </div>
-          )}
-
-          {filtered.length > 0 && (
-            <ul className="mt-1 max-h-72 overflow-y-auto" role="listbox">
-              {filtered.map((d, i) => (
-                <li
-                  key={d.code}
-                  role="option"
-                  aria-selected={i === activeIndex}
-                  className={cn(
-                    "flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1.5 text-sm",
-                    i === activeIndex
-                      ? "bg-[var(--color-accent)]"
-                      : "hover:bg-[var(--color-muted)]",
-                  )}
-                  onMouseEnter={() => setActiveIndex(i)}
-                  onClick={() => apply(d)}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium">{d.code}</span>
-                    <StatusChip status={d.status} />
-                  </div>
-                  <div className="flex items-baseline justify-between gap-2 text-xs text-[var(--color-muted-foreground)]">
-                    <span className="truncate">
-                      {d.dealName} · {d.tenantName}
-                    </span>
-                    <span className="tabular-nums whitespace-nowrap">
-                      {d.leaseSF.toLocaleString("en-US")} SF
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="mt-1 border-t px-2 pt-1.5 text-[10px] text-[var(--color-muted-foreground)]">
-            ↑↓ navigate · ⏎ select · esc close
-          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------- subcomponents ----------
+
+function UploadPrompt({ onClick, error }: { onClick: () => void; error: string | null }) {
+  return (
+    <div className="flex flex-col items-stretch gap-2 px-2 py-3 text-sm">
+      <div className="flex flex-col items-center gap-1.5 py-3">
+        <div className="rounded-full bg-[var(--color-muted)] p-2 text-[var(--color-muted-foreground)]">
+          <Upload className="size-5" />
+        </div>
+        <div className="font-medium">Upload deals CSV</div>
+        <p className="px-4 text-center text-[11px] text-[var(--color-muted-foreground)]">
+          Stays in this browser's local storage. Never uploaded to a server,
+          never committed to the repo.
+        </p>
+      </div>
+      <Button onClick={onClick} className="mx-auto" size="sm">
+        <Upload /> Choose file…
+      </Button>
+      {error && (
+        <div className="rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 px-2 py-1.5 text-xs text-[var(--color-destructive)]">
+          {error}
+        </div>
+      )}
+      <p className="px-1 text-center text-[10px] text-[var(--color-muted-foreground)]">
+        Required columns: Code · Deal Name · Tenant Name · Project SF · Building SF · Lease SF · Trended Rent · Rent Escalations · Lease Term · Start Month (Date) · Free Rent (months) · TIs · LCs · LC Override · Status
+      </p>
     </div>
   );
 }

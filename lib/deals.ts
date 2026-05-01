@@ -1,9 +1,10 @@
 /**
- * Deal data from the UW assumptions CSV (`public/deals.csv`).
+ * Deal data from a user-uploaded UW assumptions CSV.
  *
- * The CSV is a static asset served from /deals.csv. Loaded once at app
- * startup, parsed into normalized Deal objects, and held in memory so the
- * deal picker can search instantly.
+ * The CSV is uploaded in the browser (FileReader → parseDeals → store).
+ * It never touches the repo, never leaves the user's machine. The parsed
+ * Deal objects live in zustand's persisted slice, so the user uploads
+ * once per browser and the data sticks across reloads.
  *
  * Column mapping (CSV → Deal):
  *   Code              → code (search key + audit trail)
@@ -118,27 +119,6 @@ export function parseUSDate(s: string): string {
   const mm = String(m).padStart(2, "0");
   const dd = String(d).padStart(2, "0");
   return `${y}-${mm}-${dd}`;
-}
-
-// ---------------------------------------------------------------------------
-// Loader (browser-side, fetches the static asset)
-// ---------------------------------------------------------------------------
-
-let cache: Promise<Deal[]> | null = null;
-
-export function loadDeals(): Promise<Deal[]> {
-  if (cache) return cache;
-  cache = fetch("/deals.csv")
-    .then((r) => {
-      if (!r.ok) throw new Error(`Failed to load deals.csv: ${r.status}`);
-      return r.text();
-    })
-    .then(parseDeals)
-    .catch((err) => {
-      cache = null; // allow retry
-      throw err;
-    });
-  return cache;
 }
 
 // ---------------------------------------------------------------------------

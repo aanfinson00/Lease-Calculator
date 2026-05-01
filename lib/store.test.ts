@@ -19,7 +19,7 @@ function resetStore() {
   const proposalId = useAppStore.getState().addScenario("Proposal");
   useAppStore.getState().setComparisonA(survivorId);
   useAppStore.getState().setComparisonB(proposalId);
-  // Reset transient slice + property + globals.
+  // Reset transient slice + property + globals + deals.
   useAppStore.setState({
     property: { name: "" },
     globals: {
@@ -31,6 +31,7 @@ function resetStore() {
       lcCalculation: "tiered",
       horizonMonths: 204,
     },
+    deals: [],
     holdNer: null,
   });
   void s;
@@ -168,5 +169,43 @@ describe("useAppStore — persistence", () => {
     const raw = localStorage.getItem("lease-calculator/v1");
     const parsed = JSON.parse(raw!);
     expect(parsed.state.holdNer).toBeUndefined();
+  });
+});
+
+describe("useAppStore — deals slice (uploaded CSV)", () => {
+  const fakeDeal = {
+    code: "TestCode",
+    dealName: "Test Deal",
+    tenantName: "Test Tenant",
+    projectSF: 100_000,
+    buildingSF: 90_000,
+    leaseSF: 80_000,
+    baseRatePSF: 10,
+    escalation: 0.03,
+    leaseTermMonths: 60,
+    commencement: "2026-01-01",
+    freeRentMonths: 3,
+    tiAllowancePSF: 5,
+    lcPercent: 0.06,
+    status: "LEASE",
+  };
+
+  it("starts empty", () => {
+    expect(useAppStore.getState().deals).toEqual([]);
+  });
+
+  it("setDeals replaces the list; clearDeals empties it", () => {
+    useAppStore.getState().setDeals([fakeDeal, { ...fakeDeal, code: "Other" }]);
+    expect(useAppStore.getState().deals).toHaveLength(2);
+    useAppStore.getState().clearDeals();
+    expect(useAppStore.getState().deals).toEqual([]);
+  });
+
+  it("round-trips through localStorage (persisted)", () => {
+    useAppStore.getState().setDeals([fakeDeal]);
+    const raw = localStorage.getItem("lease-calculator/v1");
+    const parsed = JSON.parse(raw!);
+    expect(parsed.state.deals).toHaveLength(1);
+    expect(parsed.state.deals[0].code).toBe("TestCode");
   });
 });

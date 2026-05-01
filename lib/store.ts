@@ -19,6 +19,7 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Deal } from "./deals";
 import type { Globals, ScenarioInputs } from "./types";
 import type { FreeVariable } from "./solver";
 
@@ -82,6 +83,11 @@ interface PersistedState {
   globals: Globals;
   scenarios: ScenarioRecord[];
   comparison: { aId: string; bId: string };
+  /**
+   * User-uploaded deals from a CSV. Lives only in this browser's
+   * localStorage — never sent to the server, never committed to the repo.
+   */
+  deals: Deal[];
 }
 
 interface Actions {
@@ -99,6 +105,10 @@ interface Actions {
   // Comparison
   setComparisonA: (id: string) => void;
   setComparisonB: (id: string) => void;
+
+  // Deals (user-uploaded CSV)
+  setDeals: (deals: Deal[]) => void;
+  clearDeals: () => void;
 
   // Hold-NER (transient)
   holdNer: HoldNerState | null;
@@ -126,6 +136,7 @@ function makeInitialState(): PersistedState {
   return {
     property: { name: "" },
     globals: DEFAULT_GLOBALS,
+    deals: [],
     scenarios: [uw, proposal],
     comparison: { aId: uw.id, bId: proposal.id },
   };
@@ -216,18 +227,22 @@ export const useAppStore = create<AppStore>()(
       setComparisonB: (id) =>
         set((s) => ({ comparison: { ...s.comparison, bId: id } })),
 
+      setDeals: (deals) => set({ deals }),
+      clearDeals: () => set({ deals: [] }),
+
       setHoldNer: (holdNer) => set({ holdNer }),
     }),
     {
       name: "lease-calculator/v1",
-      // Only persist the four data slices; holdNer stays in memory.
+      // Persist all five data slices; holdNer stays in memory.
       partialize: (state) => ({
         property: state.property,
         globals: state.globals,
         scenarios: state.scenarios,
         comparison: state.comparison,
+        deals: state.deals,
       }),
-      version: 7,
+      version: 8,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -245,6 +260,10 @@ export const useAppStore = create<AppStore>()(
       // v6 → v7: scenarios gain optional `dealCode` (audit trail of which
       //          CSV deal was loaded). Optional with no-op default; the
       //          version bump alone forces re-hydration so types match.
+      // v7 → v8: persisted state gains `deals: Deal[]` for user-uploaded
+      //          CSV. Backfill empty array — the deals.csv file used to live
+      //          in the repo; users now upload it in the browser, so
+      //          previously-loaded data simply isn't there.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -295,6 +314,9 @@ export const useAppStore = create<AppStore>()(
               lcTenantRepPercent: state.globals.lcTenantRepPercent ?? 0.045,
             };
           }
+        }
+        if (state && version < 8 && !Array.isArray(state.deals)) {
+          state.deals = [];
         }
         return state as unknown as PersistedState;
       },
