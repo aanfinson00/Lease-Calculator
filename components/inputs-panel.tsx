@@ -107,11 +107,17 @@ export function InputsPanel() {
 function DealAssumptions() {
   const globals = useAppStore((s) => s.globals);
   const update = useAppStore((s) => s.updateGlobals);
+  const totalLC = (globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100;
 
   return (
     <div className="flex flex-col gap-1.5 py-3 first:pt-0">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-        Deal Assumptions · shared
+      <div className="flex items-baseline gap-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+          Deal Assumptions · shared
+        </span>
+        <span className="text-[10px] tabular-nums text-[var(--color-muted-foreground)]">
+          Combined LC <span className="font-semibold text-[var(--color-foreground)]">{totalLC.toFixed(2)}%</span>
+        </span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Stack label="Shell ($/SF)">
@@ -132,12 +138,10 @@ function DealAssumptions() {
             onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
           />
         </Stack>
-        <Stack
-          label={`Landlord Rep (%) · total ${(((globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100).toFixed(2))}%`}
-        >
+        <Stack label="Landlord Rep (%)">
           <Input
             type="number"
-            step={0.1}
+            step={0.01}
             className="h-8 px-2 text-sm"
             value={(globals.lcLLRepPercent * 100).toFixed(2)}
             onChange={(e) => update({ lcLLRepPercent: Number(e.target.value) / 100 })}
@@ -146,7 +150,7 @@ function DealAssumptions() {
         <Stack label="Tenant Rep (%)">
           <Input
             type="number"
-            step={0.1}
+            step={0.01}
             className="h-8 px-2 text-sm"
             value={(globals.lcTenantRepPercent * 100).toFixed(2)}
             onChange={(e) => update({ lcTenantRepPercent: Number(e.target.value) / 100 })}
