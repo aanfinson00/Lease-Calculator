@@ -134,6 +134,22 @@ describe("buildAnnualSchedule", () => {
     expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.04, 6);
     expect(s[4].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 3), 6);
   });
+
+  it("YoC Yr1 reflects a year-1 override (regression)", () => {
+    // Without override, YoC Yr1 = baseRate / buildingCostPSF
+    const baseline = runScenario(proposalInputs, makeGlobals());
+    // Override yr 1 to a different rate; YoC Yr1 should track the override,
+    // not the unchanged inputs.baseRatePSF.
+    const overridden = runScenario(
+      { ...proposalInputs, rentScheduleOverride: [12.0] },
+      makeGlobals(),
+    );
+    expect(overridden.yocYr1).not.toBeCloseTo(baseline.yocYr1, 4);
+    // numerator = 12.0 (override); denominator differs only because LC
+    // shifts slightly when yr-1 contracted rent rises, so just sanity-check
+    // the override numerator dominates.
+    expect(overridden.yocYr1).toBeCloseTo(12.0 / overridden.buildingCostPSF, 6);
+  });
 });
 
 // ------------------------------------------------------------------------

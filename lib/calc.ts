@@ -351,7 +351,11 @@ export function runScenario(
   const buildingCostPSF = globals.shellCostPSF + inputs.tiAllowancePSF + lcPSF;
   const avgRatePSF = calcAvgRatePSF(schedule, term);
 
-  const yocYr1 = buildingCostPSF > 0 ? inputs.baseRatePSF / buildingCostPSF : 0;
+  // YoC Yr1 should reflect any per-year override on year 1, so pull the
+  // rate from the schedule (which incorporates rentScheduleOverride[0])
+  // rather than `inputs.baseRatePSF` (the formula seed).
+  const yr1Rate = schedule.find((r) => r.year === 1)?.annualRatePSF ?? inputs.baseRatePSF;
+  const yocYr1 = buildingCostPSF > 0 ? yr1Rate / buildingCostPSF : 0;
   const yocTerm = buildingCostPSF > 0 ? avgRatePSF / buildingCostPSF : 0;
 
   const baseRent = sumColumn(grid, span, "baseRentPSF");
