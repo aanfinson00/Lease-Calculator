@@ -78,24 +78,23 @@ function annualRateForYear(inputs: ScenarioInputs, year: number): number {
  *
  * Two calculation modes:
  *   tiered — full lcPercent on yrs 1-5 rent + lcPercent/2 on yrs 6+ rent
- *            (industrial standard; brokers earn full LC on the early "won"
- *             portion and a reduced rate on later renewal-equivalent years).
+ *            (industrial standard; full LC on the first 60 months of
+ *             contracted rent, half on month 61+).
  *   flat   — full lcPercent on rent across the entire term.
  *
  * "Rent collected in year Y" = annualRatePSF[Y] × monthsActive[Y] / 12.
- * The free-rent row (year 0) is excluded — it contributes $0 either way,
- * but skipping it makes the convention explicit.
+ * With the calendar-aligned schedule, years 1-5 always cover months 1-60
+ * exactly; year 6+ covers months 61 through end of term.
  */
 export function calcLC(
   schedule: AnnualScheduleRow[],
   lcPercent: number,
   calculation: LCCalculation = "tiered",
 ): number {
-  let tier1 = 0; // years 1-5
-  let tier2 = 0; // years 6+
+  let tier1 = 0; // years 1-5  (months 1-60)
+  let tier2 = 0; // years 6+   (months 61+)
 
   for (const row of schedule) {
-    if (row.year === 0) continue;
     const rentPSF = row.annualRatePSF * (row.monthsActive / 12);
     if (row.year <= 5) tier1 += rentPSF;
     else tier2 += rentPSF;

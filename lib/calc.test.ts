@@ -214,6 +214,17 @@ describe("calcLC", () => {
     const short = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 60 });
     expect(calcLC(short, 0.09, "tiered")).toBeCloseTo(calcLC(short, 0.09, "flat"), 6);
   });
+
+  it("tier boundary is exactly month 60 (61-mo lease has 1 mo of yr6+ rent at half %)", () => {
+    // 61-month lease: yrs 1-5 cover mo 1-60 (full %), yr 6 covers mo 61 only.
+    // Diff between tiered and flat = (lcPercent/2) × (yr 6 rate × 1/12).
+    const s = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 61 });
+    const tiered = calcLC(s, 0.09, "tiered");
+    const flat = calcLC(s, 0.09, "flat");
+    const yr6Rate = s.find((r) => r.year === 6)?.annualRatePSF ?? 0;
+    const yr6OneMonthContribution = yr6Rate * (1 / 12);
+    expect(flat - tiered).toBeCloseTo(0.045 * yr6OneMonthContribution, 6);
+  });
 });
 
 // ------------------------------------------------------------------------
