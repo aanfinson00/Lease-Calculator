@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
@@ -62,7 +63,10 @@ export default function Home() {
             <div className="h-10 w-px bg-[var(--color-border)]" />
             <div className="flex-1"><PropertyHeader /></div>
           </div>
-          <ExportPdfButton />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <ExportPdfButton />
+          </div>
         </div>
         <ScenarioBar />
       </header>

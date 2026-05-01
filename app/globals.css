@@ -38,6 +38,36 @@
   --radius: 0.5rem;
 }
 
+/* Dark mode — same OKLCH structure with lightness inverted and chroma
+   boosted on accents so they hold up against a dark background.
+   Activated when `<html>` has the `dark` class (set by the pre-hydration
+   script in app/layout.tsx based on user choice + system preference). */
+.dark {
+  --background: oklch(0.16 0.015 250);
+  --foreground: oklch(0.96 0.003 80);
+  --card: oklch(0.20 0.015 250);
+  --card-foreground: oklch(0.96 0.003 80);
+  --popover: oklch(0.20 0.015 250);
+  --popover-foreground: oklch(0.96 0.003 80);
+  --primary: oklch(0.68 0.13 245);
+  --primary-foreground: oklch(0.16 0.015 250);
+  --secondary: oklch(0.24 0.015 250);
+  --secondary-foreground: oklch(0.96 0.003 80);
+  --muted: oklch(0.22 0.012 250);
+  --muted-foreground: oklch(0.68 0.018 250);
+  --accent: oklch(0.27 0.025 245);
+  --accent-foreground: oklch(0.92 0.02 245);
+  --destructive: oklch(0.65 0.18 30);
+  --destructive-foreground: oklch(0.96 0.003 80);
+  --success: oklch(0.65 0.13 155);
+  --success-foreground: oklch(0.16 0.015 250);
+  --cost: oklch(0.68 0.16 35);
+  --cost-foreground: oklch(0.16 0.015 250);
+  --border: oklch(0.27 0.012 250);
+  --input: oklch(0.27 0.012 250);
+  --ring: oklch(0.68 0.13 245);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
