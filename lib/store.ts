@@ -227,7 +227,7 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 6,
+      version: 7,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -242,6 +242,9 @@ export const useAppStore = create<AppStore>()(
       //          lcTenantRepPercent (50/50 of the prior total). The calc
       //          engine continues to consume the sum, so headline numbers
       //          are preserved exactly.
+      // v6 → v7: scenarios gain optional `dealCode` (audit trail of which
+      //          CSV deal was loaded). Optional with no-op default; the
+      //          version bump alone forces re-hydration so types match.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {

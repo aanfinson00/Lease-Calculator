@@ -37,6 +37,13 @@ export interface ScenarioInputs {
   /** Display name (e.g. "UW", "Counter v1"). */
   name: string;
 
+  /**
+   * Optional CSV deal code that this scenario was last loaded from. Audit
+   * trail only — clearing or editing inputs doesn't unset this. The deal
+   * picker writes it; nothing in the calc engine reads it.
+   */
+  dealCode?: string;
+
   // SF block
   projectSF: number;
   buildingSF: number;

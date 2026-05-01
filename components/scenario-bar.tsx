@@ -1,6 +1,7 @@
 "use client";
 
 import { Copy, Plus, Trash2 } from "lucide-react";
+import { DealPicker } from "@/components/deal-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +66,7 @@ export function ScenarioBar() {
                 >
                   B
                 </Button>
+                <DealPicker scenarioId={sc.id} align="right" />
                 <Button
                   size="icon"
                   variant="ghost"
