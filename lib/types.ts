@@ -12,6 +12,10 @@ export type LCStructure = "upfront" | "split50";
 //  upfront — full LC paid in month 1
 //  split50 — 50% in month 1, 50% at rent commencement (after free rent)
 
+export type LCCalculation = "tiered" | "flat";
+//  tiered — full % on yr 1-5 rent, half % on yr 6+ rent (industrial standard)
+//  flat   — full % on all years' rent
+
 export interface Globals {
   /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
   discountRate: number;
@@ -21,6 +25,8 @@ export interface Globals {
   shellCostPSF: number;
   /** How LC payments are timed. */
   lcStructure: LCStructure;
+  /** How LC totals are calculated against the rent schedule. */
+  lcCalculation: LCCalculation;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
 }

@@ -8,6 +8,7 @@ const baseGlobals: Globals = {
   lcPercent: 0.09,
   shellCostPSF: 140,
   lcStructure: "upfront",
+  lcCalculation: "tiered",
   horizonMonths: 204,
 };
 

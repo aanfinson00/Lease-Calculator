@@ -31,6 +31,7 @@ const DEFAULT_GLOBALS: Globals = {
   lcPercent: 0.09,
   shellCostPSF: 140,
   lcStructure: "split50",
+  lcCalculation: "tiered",
   horizonMonths: 204,
 };
 
@@ -225,10 +226,12 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 2,
+      version: 3,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
-      // which keeps the calc identical to before) and tiDurationMonths (= 1,
-      // the original single-lump TI behavior).
+      //          which keeps the calc identical to before) and tiDurationMonths
+      //          (= 1, the original single-lump TI behavior).
+      // v2 → v3: globals gain lcCalculation (= "tiered", which preserves the
+      //          existing split-tier LC formula).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -243,6 +246,13 @@ export const useAppStore = create<AppStore>()(
                 (sc.inputs as Partial<ScenarioInputs>).tiDurationMonths ?? 1,
             },
           }));
+        }
+        if (state && version < 3 && state.globals) {
+          state.globals = {
+            ...state.globals,
+            lcCalculation:
+              (state.globals as Partial<Globals>).lcCalculation ?? "tiered",
+          };
         }
         return state as unknown as PersistedState;
       },

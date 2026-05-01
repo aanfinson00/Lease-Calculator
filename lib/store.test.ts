@@ -27,6 +27,7 @@ function resetStore() {
       lcPercent: 0.09,
       shellCostPSF: 140,
       lcStructure: "split50",
+      lcCalculation: "tiered",
       horizonMonths: 204,
     },
     holdNer: null,

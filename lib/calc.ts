@@ -10,6 +10,7 @@
 import type {
   AnnualScheduleRow,
   Globals,
+  LCCalculation,
   MonthlyGridRow,
   ScenarioInputs,
   ScenarioResults,
@@ -61,15 +62,23 @@ export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[]
 // ---------------------------------------------------------------------------
 
 /**
- * Split-tier LC formula:
- *   LC PSF = lcPercent × (rent collected in yrs 1-5)
- *          + (lcPercent / 2) × (rent collected in yrs 6+)
+ * Leasing commission total ($/SF over the term).
+ *
+ * Two calculation modes:
+ *   tiered — full lcPercent on yrs 1-5 rent + lcPercent/2 on yrs 6+ rent
+ *            (industrial standard; brokers earn full LC on the early "won"
+ *             portion and a reduced rate on later renewal-equivalent years).
+ *   flat   — full lcPercent on rent across the entire term.
  *
  * "Rent collected in year Y" = annualRatePSF[Y] × monthsActive[Y] / 12.
  * The free-rent row (year 0) is excluded — it contributes $0 either way,
  * but skipping it makes the convention explicit.
  */
-export function calcLC(schedule: AnnualScheduleRow[], lcPercent: number): number {
+export function calcLC(
+  schedule: AnnualScheduleRow[],
+  lcPercent: number,
+  calculation: LCCalculation = "tiered",
+): number {
   let tier1 = 0; // years 1-5
   let tier2 = 0; // years 6+
 
@@ -80,6 +89,7 @@ export function calcLC(schedule: AnnualScheduleRow[], lcPercent: number): number
     else tier2 += rentPSF;
   }
 
+  if (calculation === "flat") return lcPercent * (tier1 + tier2);
   return lcPercent * tier1 + (lcPercent / 2) * tier2;
 }
 
@@ -284,7 +294,7 @@ export function runScenario(
   globals: Globals,
 ): ScenarioResults {
   const schedule = buildAnnualSchedule(inputs);
-  const lcPSF = calcLC(schedule, globals.lcPercent);
+  const lcPSF = calcLC(schedule, globals.lcPercent, globals.lcCalculation);
   const grid = buildMonthlyGrid(inputs, globals, schedule, lcPSF);
   const term = inputs.leaseTermMonths;
 

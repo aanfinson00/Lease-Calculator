@@ -16,6 +16,7 @@ const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   lcPercent: 0.09,
   shellCostPSF: 140,
   lcStructure: "upfront",
+  lcCalculation: "tiered",
   horizonMonths: 204,
   ...overrides,
 });
@@ -140,6 +141,24 @@ describe("calcLC", () => {
     const sNoFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0, leaseTermMonths: 124 });
     // Same paying months → same LC
     expect(calcLC(s, 0.09)).toBeCloseTo(calcLC(sNoFree, 0.09), 6);
+  });
+
+  it("flat calculation applies full % to every year (yields more than tiered)", () => {
+    const s = buildAnnualSchedule(proposalInputs);
+    const tiered = calcLC(s, 0.09, "tiered");
+    const flat = calcLC(s, 0.09, "flat");
+    expect(flat).toBeGreaterThan(tiered);
+    // Flat = full % × full term rent. Tiered = full × yr1-5 + half × yr6+.
+    // The diff is exactly half × yr6+ rent.
+    const yr6plus = s
+      .filter((row) => row.year >= 6)
+      .reduce((sum, row) => sum + row.annualRatePSF * (row.monthsActive / 12), 0);
+    expect(flat - tiered).toBeCloseTo(0.09 * yr6plus * 0.5, 6);
+  });
+
+  it("flat ≡ tiered when the term is ≤ 5 years (no yr6+ rent)", () => {
+    const short = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 60 });
+    expect(calcLC(short, 0.09, "tiered")).toBeCloseTo(calcLC(short, 0.09, "flat"), 6);
   });
 });
 
