@@ -43,6 +43,11 @@
    Activated when `<html>` has the `dark` class (set by the pre-hydration
    script in app/layout.tsx based on user choice + system preference). */
 .dark {
+  /* Tells the browser to render native form controls (the open <select>
+     dropdown panel, scrollbars, date pickers) in dark UA chrome. Without
+     this, the dropdown options stay light-themed even though the rest of
+     the page is dark. */
+  color-scheme: dark;
   --background: oklch(0.16 0.015 250);
   --foreground: oklch(0.96 0.003 80);
   --card: oklch(0.20 0.015 250);

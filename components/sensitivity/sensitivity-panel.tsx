@@ -67,6 +67,20 @@ export function SensitivityPanel() {
 
   const [solverError, setSolverError] = useState<string | null>(null);
 
+  // Preferred NER metric for the solver. Persists across Hold-NER toggles —
+  // user can pick "Undiscounted" before checking the box, then enabling
+  // Hold-NER seeds the solver target from the chosen metric.
+  const [nerKind, setNerKindState] = useState<NERKind>(
+    holdNer?.nerKind ?? "discounted",
+  );
+  // Keep local state in sync if holdNer.nerKind changes from elsewhere.
+  useEffect(() => {
+    if (holdNer?.nerKind && holdNer.nerKind !== nerKind) {
+      setNerKindState(holdNer.nerKind);
+    }
+  }, [holdNer?.nerKind]);
+  // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!active) {
     return (
       <Card>
@@ -145,7 +159,7 @@ export function SensitivityPanel() {
             <select
               value={activeId}
               onChange={(e) => setActiveId(e.target.value)}
-              className="h-9 rounded-md border bg-transparent px-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+              className="h-9 rounded-md border bg-[var(--color-background)] px-2 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
             >
               {scenarios.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -165,10 +179,13 @@ export function SensitivityPanel() {
                 if (e.target.checked) {
                   setHoldNer({
                     enabled: true,
-                    targetNER: liveResults.discountedNER,
+                    targetNER:
+                      nerKind === "undiscounted"
+                        ? liveResults.undiscountedNER
+                        : liveResults.discountedNER,
                     freeVar: holdNer?.freeVar ?? "baseRatePSF",
                     scenarioId: active.id,
-                    nerKind: holdNer?.nerKind ?? "discounted",
+                    nerKind,
                   });
                 } else {
                   setHoldNer(null);
@@ -179,38 +196,37 @@ export function SensitivityPanel() {
             <span className="font-medium">Hold NER</span>
           </label>
 
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-[var(--color-muted-foreground)]">Metric:</Label>
+            <select
+              value={nerKind}
+              onChange={(e) => {
+                const next = e.target.value as NERKind;
+                setNerKindState(next);
+                if (isHolding && holdNer) {
+                  // Re-seed target to the current value of the chosen NER
+                  // and bump the free var off discountRate if needed
+                  // (DR has no effect on undiscounted NER → no convergence).
+                  const seed =
+                    next === "undiscounted"
+                      ? liveResults.undiscountedNER
+                      : liveResults.discountedNER;
+                  const freeVar =
+                    next === "undiscounted" && holdNer.freeVar === "discountRate"
+                      ? "baseRatePSF"
+                      : holdNer.freeVar;
+                  setHoldNer({ ...holdNer, nerKind: next, targetNER: seed, freeVar });
+                }
+              }}
+              className="h-9 rounded-md border bg-[var(--color-background)] px-2 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+            >
+              <option value="discounted">Discounted NER</option>
+              <option value="undiscounted">Undiscounted NER</option>
+            </select>
+          </div>
+
           {isHolding && (
             <>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-[var(--color-muted-foreground)]">Hold:</Label>
-                <select
-                  value={holdNer!.nerKind}
-                  onChange={(e) => {
-                    const nerKind = e.target.value as NERKind;
-                    // Re-seed target to the current value of the chosen NER and
-                    // bump the free var off discountRate if needed (it has no
-                    // effect on undiscounted NER → solver can't converge).
-                    const seed =
-                      nerKind === "undiscounted"
-                        ? liveResults.undiscountedNER
-                        : liveResults.discountedNER;
-                    const freeVar =
-                      nerKind === "undiscounted" && holdNer!.freeVar === "discountRate"
-                        ? "baseRatePSF"
-                        : holdNer!.freeVar;
-                    setHoldNer({
-                      ...holdNer!,
-                      nerKind,
-                      targetNER: seed,
-                      freeVar,
-                    });
-                  }}
-                  className="h-9 rounded-md border bg-transparent px-2 text-sm"
-                >
-                  <option value="discounted">Discounted</option>
-                  <option value="undiscounted">Undiscounted</option>
-                </select>
-              </div>
               <div className="flex items-center gap-2">
                 <Label className="text-xs text-[var(--color-muted-foreground)]">
                   Target ({holdNer!.nerKind === "undiscounted" ? "undisc." : "disc."} NER, $/SF):
@@ -235,7 +251,7 @@ export function SensitivityPanel() {
                   onChange={(e) =>
                     setHoldNer({ ...holdNer!, freeVar: e.target.value as FreeVariable })
                   }
-                  className="h-9 rounded-md border bg-transparent px-2 text-sm"
+                  className="h-9 rounded-md border bg-[var(--color-background)] px-2 text-sm text-[var(--color-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
                 >
                   {(holdNer!.nerKind === "undiscounted" ? FREE_VARS_FOR_UNDISCOUNTED : FREE_VARS).map(
                     (v) => (
