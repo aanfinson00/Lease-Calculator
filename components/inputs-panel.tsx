@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -23,6 +24,8 @@ interface FieldDef {
   computeFormat?: "percent" | "currency" | "number";
   /** When set, the cell renders a horizontal radio group with these options. */
   radio?: { value: string; label: string }[];
+  /** Optional help bubble rendered next to the column label. */
+  help?: React.ReactNode;
 }
 
 interface SectionDef {
@@ -72,6 +75,19 @@ const SECTIONS: SectionDef[] = [
           { value: "tiered", label: "Tiered" },
           { value: "flat", label: "Flat" },
         ],
+        help: (
+          <>
+            <p className="mb-1 font-semibold">How the LC total is calculated against contracted rent.</p>
+            <p className="mb-1">
+              <span className="font-medium">Tiered:</span> full % on the first 60 paying months
+              of contracted rent + half % on month 61 onward. Industrial standard.
+            </p>
+            <p>
+              <span className="font-medium">Flat:</span> full % on every paying month, no tier
+              break. Simpler but yields a higher LC total on long leases.
+            </p>
+          </>
+        ),
       },
       {
         field: "lcStructure",
@@ -80,6 +96,20 @@ const SECTIONS: SectionDef[] = [
           { value: "split50", label: "50/50" },
           { value: "upfront", label: "Upfront" },
         ],
+        help: (
+          <>
+            <p className="mb-1 font-semibold">When the LC dollars actually hit cash flow.</p>
+            <p className="mb-1">
+              <span className="font-medium">50/50:</span> half at lease execution, half at rent
+              commencement (after any front-loaded free rent). The LL defers part of the cash
+              outlay until rent collection begins.
+            </p>
+            <p>
+              <span className="font-medium">Upfront:</span> 100% at lease execution. Larger
+              early outflow, no second payment.
+            </p>
+          </>
+        ),
       },
     ],
   },
@@ -208,9 +238,10 @@ function Section({ section, scenarios }: SectionProps) {
         {section.fields.map((f, idx) => (
           <div
             key={fieldKey(f, idx)}
-            className="text-[11px] text-[var(--color-muted-foreground)]"
+            className="flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)]"
           >
-            {f.label}
+            <span>{f.label}</span>
+            {f.help && <HelpTooltip>{f.help}</HelpTooltip>}
           </div>
         ))}
       </div>
