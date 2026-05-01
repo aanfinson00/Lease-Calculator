@@ -303,21 +303,31 @@ describe("runScenario — LC structure variants", () => {
     expect(r.grid[1].lcPSF).toBe(0);
   });
 
-  it("50/50 split puts half in month 1, half at rent commencement", () => {
+  it("50/50 with execution = commencement: both halves collapse to M1 regardless of free rent", () => {
+    // proposalInputs has execution = commencement = "2025-01-01", so the
+    // commencement month is M1 of the grid; both halves land there.
     const r = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
-    const half = -r.totals.lcPSF / 2;
-    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6); // month 1
-    // free=6 → rent commencement is month 7 → grid index 6
-    expect(r.grid[6].lcPSF).toBeCloseTo(half, 6);
-  });
-
-  it("50/50 with no free rent collapses to month 1", () => {
-    const r = runScenario(
-      { ...proposalInputs, freeRentMonths: 0, lcStructure: "split50" },
-      makeGlobals(),
-    );
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
     expect(r.grid[1].lcPSF).toBe(0);
+    expect(r.grid[6].lcPSF).toBe(0); // not at rent commencement (post-free)
+  });
+
+  it("50/50 with execution before commencement: half at M1 (exec), half at commencement", () => {
+    // 3-month lead time → commencement is grid M4 (index 3).
+    const r = runScenario(
+      {
+        ...proposalInputs,
+        leaseExecutionDate: "2024-10-01",
+        leaseCommencement: "2025-01-01",
+        lcStructure: "split50",
+      },
+      makeGlobals(),
+    );
+    const half = -r.totals.lcPSF / 2;
+    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
+    expect(r.grid[3].lcPSF).toBeCloseTo(half, 6);
+    // Free rent post-commencement does NOT delay the second half.
+    expect(r.grid[9].lcPSF).toBe(0);
   });
 
   it("undiscounted NER is the same regardless of LC timing (only timing differs, not total)", () => {
@@ -326,9 +336,22 @@ describe("runScenario — LC structure variants", () => {
     expect(a.undiscountedNER).toBeCloseTo(b.undiscountedNER, 6);
   });
 
-  it("discounted NER is HIGHER for split50 (deferred LC = less discount cost)", () => {
+  it("discounted NER is the same as upfront when execution = commencement (both collapse to M1)", () => {
+    // With execution = commencement, split50 puts both halves at M1 too —
+    // identical timing to upfront, so the discounted NERs match exactly.
     const a = runScenario({ ...proposalInputs, lcStructure: "upfront" }, makeGlobals());
     const b = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
+    expect(a.discountedNER).toBeCloseTo(b.discountedNER, 6);
+  });
+
+  it("discounted NER is HIGHER for split50 when execution precedes commencement (second half is deferred)", () => {
+    const earlySign = {
+      ...proposalInputs,
+      leaseExecutionDate: "2024-07-01",
+      leaseCommencement: "2025-01-01",
+    };
+    const a = runScenario({ ...earlySign, lcStructure: "upfront" }, makeGlobals());
+    const b = runScenario({ ...earlySign, lcStructure: "split50" }, makeGlobals());
     expect(b.discountedNER).toBeGreaterThan(a.discountedNER);
   });
 });
@@ -416,16 +439,18 @@ describe("calcUndiscountedNER / calcDiscountedNER", () => {
 // ------------------------------------------------------------------------
 
 describe("lease execution date — commission split timing", () => {
-  it("execution === commencement preserves original split50 timing (half M1, half at RC)", () => {
+  it("execution === commencement: split50 collapses both halves to M1", () => {
+    // proposalInputs: execution = commencement. commencement month = M1 of
+    // grid → both halves land there; full LC at M1.
     const r = runScenario({ ...proposalInputs, lcStructure: "split50" }, makeGlobals());
-    const half = -r.totals.lcPSF / 2;
-    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
-    expect(r.grid[6].lcPSF).toBeCloseTo(half, 6); // free=6 → RC at month 7
+    expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
+    expect(r.grid[1].lcPSF).toBe(0);
   });
 
-  it("execution before commencement pushes commission half #2 out further", () => {
-    // 3-month lead time; free=6. Half at execution (M1). Half at rent comm
-    // (M = offset + free + 1 = 3 + 6 + 1 = 10, grid index 9).
+  it("execution before commencement: half at M1 (exec), half at lease commencement", () => {
+    // 3-month lead time → commencement is M4 of grid (index 3). Free rent
+    // doesn't delay the second half — it's tied to commencement, not rent
+    // commencement.
     const r = runScenario(
       {
         ...proposalInputs,
@@ -437,7 +462,7 @@ describe("lease execution date — commission split timing", () => {
     );
     const half = -r.totals.lcPSF / 2;
     expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
-    expect(r.grid[9].lcPSF).toBeCloseTo(half, 6);
+    expect(r.grid[3].lcPSF).toBeCloseTo(half, 6);
   });
 
   it("execution before commencement → discounted NER is LOWER than execution = commencement (later cash inflows discounted more)", () => {
@@ -474,24 +499,14 @@ describe("free rent (always front-loaded)", () => {
     expect(r.grid[6].baseRentPSF).toBeGreaterThan(0);
   });
 
-  it("split50: half at execution (M1), half at rent commencement (M = free + 1)", () => {
+  it("split50 with execution = commencement: free rent does NOT delay the second LC half", () => {
+    // Both halves collapse to M1 (lease commencement) regardless of free.
     const r = runScenario(
       { ...proposalInputs, lcStructure: "split50" },
       makeGlobals(),
     );
-    const half = -r.totals.lcPSF / 2;
-    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
-    // free=6 → rent commencement at month 7
-    expect(r.grid[6].lcPSF).toBeCloseTo(half, 6);
-  });
-
-  it("split50 with no free rent: both halves collapse to M1", () => {
-    const r = runScenario(
-      { ...proposalInputs, freeRentMonths: 0, lcStructure: "split50" },
-      makeGlobals(),
-    );
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
-    expect(r.grid[1].lcPSF).toBe(0);
+    expect(r.grid[6].lcPSF).toBe(0); // not at the post-free "rent commencement"
   });
 });
 

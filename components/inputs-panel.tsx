@@ -101,9 +101,9 @@ const SECTIONS: SectionDef[] = [
           <>
             <p className="mb-1 font-semibold">When the LC dollars actually hit cash flow.</p>
             <p className="mb-1">
-              <span className="font-medium">50/50:</span> half at lease execution, half at rent
-              commencement (after any front-loaded free rent). The LL defers part of the cash
-              outlay until rent collection begins.
+              <span className="font-medium">50/50:</span> half at lease execution, half at lease
+              commencement. Free rent does not delay the second half. If execution and
+              commencement are the same date, both halves collapse to that day.
             </p>
             <p>
               <span className="font-medium">Upfront:</span> 100% at lease execution. Larger

@@ -174,13 +174,15 @@ export function buildMonthlyGrid(
     return annualRateForYear(inputs, calendarYear);
   };
 
-  // LC payment timing — half at execution (m=1), half at rent commencement
-  // when split50; the full amount at execution when upfront.
+  // LC payment timing — half at execution (m=1), half at lease commencement
+  // when split50; the full amount at execution when upfront. The second half
+  // tracks lease commencement (NOT rent commencement after free rent), so a
+  // lease with front-loaded free still pays its second LC half on day 1 of
+  // the lease — independent of the abatement.
   const lcAtExecution = inputs.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
-  const lcAtRC = inputs.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
-  // 1-indexed month (from execution) where rent collection first kicks in.
-  // Free rent is always front-loaded, so rent commencement = free rent end + 1.
-  const rcMonth = commencementOffset + free + 1;
+  const lcAtCommencement = inputs.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
+  // 1-indexed grid month (from execution) where the lease commences.
+  const commencementMonth = commencementOffset + 1;
 
   const tiPerMonth = tiDuration > 0 ? -inputs.tiAllowancePSF / tiDuration : 0;
 
@@ -200,11 +202,13 @@ export function buildMonthlyGrid(
 
     let lcPSF = 0;
     if (m === 1) lcPSF += lcAtExecution;
-    if (m === rcMonth && lcAtRC !== 0 && rcMonth !== 1) lcPSF += lcAtRC;
-    // Edge case: execution = commencement AND no free rent → both LC halves
-    // collapse to month 1 (rcMonth === 1). The lcAtExecution already holds half;
-    // add the second half here to preserve the original lump-in-month-1 behavior.
-    if (m === 1 && rcMonth === 1 && lcAtRC !== 0) lcPSF += lcAtRC;
+    // Second half at lease commencement (when split50). When execution =
+    // commencement, commencementMonth === 1 and both halves land at M1 —
+    // collapse them here so the user sees the full LC in M1 instead of
+    // double-counting against the M1 condition above.
+    if (m === commencementMonth && lcAtCommencement !== 0) {
+      lcPSF += lcAtCommencement;
+    }
 
     const netCFPSF = baseRentPSF + freeRentPSF + tiPSF + lcPSF;
 
