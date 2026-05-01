@@ -35,19 +35,24 @@ const DEFAULT_GLOBALS: Globals = {
 };
 
 /** Reasonable starting inputs — based on spec §12. User edits via the UI. */
-const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): ScenarioInputs => ({
-  name,
-  projectSF: 300_000,
-  buildingSF: 300_000,
-  proposedLeaseSF: 300_000,
-  baseRatePSF: 7,
-  escalation: 0.03,
-  tiAllowancePSF: 5,
-  freeRentMonths: 4,
-  leaseTermMonths: 125,
-  leaseCommencement: new Date().toISOString().slice(0, 10),
-  ...override,
-});
+const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): ScenarioInputs => {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    name,
+    projectSF: 300_000,
+    buildingSF: 300_000,
+    proposedLeaseSF: 300_000,
+    baseRatePSF: 7,
+    escalation: 0.03,
+    tiAllowancePSF: 5,
+    freeRentMonths: 4,
+    leaseTermMonths: 125,
+    leaseCommencement: today,
+    leaseExecutionDate: today,
+    tiDurationMonths: 1,
+    ...override,
+  };
+};
 
 const newId = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -220,7 +225,27 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 1,
+      version: 2,
+      // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
+      // which keeps the calc identical to before) and tiDurationMonths (= 1,
+      // the original single-lump TI behavior).
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<PersistedState> | undefined;
+        if (state && version < 2 && state.scenarios) {
+          state.scenarios = state.scenarios.map((sc) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              leaseExecutionDate:
+                (sc.inputs as Partial<ScenarioInputs>).leaseExecutionDate ??
+                sc.inputs.leaseCommencement,
+              tiDurationMonths:
+                (sc.inputs as Partial<ScenarioInputs>).tiDurationMonths ?? 1,
+            },
+          }));
+        }
+        return state as unknown as PersistedState;
+      },
     },
   ),
 );

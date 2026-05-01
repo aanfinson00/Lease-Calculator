@@ -51,10 +51,12 @@ export function InputsPanel() {
         </Section>
         <Section title="Concessions">
           <Row label="TI Allowance ($/SF)" field="tiAllowancePSF" step={0.5} a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
+          <Row label="TI Work Duration (months)" field="tiDurationMonths" step={1} a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
           <Row label="Free Rent (months)" field="freeRentMonths" step={1} a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
         </Section>
         <Section title="Term">
           <Row label="Lease Term (months)" field="leaseTermMonths" step={1} a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
+          <Row label="Lease Execution" field="leaseExecutionDate" type="date" a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
           <Row label="Lease Commencement" field="leaseCommencement" type="date" a={a.inputs} b={b.inputs} aId={aId} bId={bId} />
         </Section>
       </CardContent>

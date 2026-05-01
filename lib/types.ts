@@ -51,6 +51,19 @@ export interface ScenarioInputs {
   leaseTermMonths: number;
   /** ISO date string (YYYY-MM-DD) for lease commencement. */
   leaseCommencement: string;
+  /**
+   * ISO date string (YYYY-MM-DD) for lease execution (signing).
+   * Triggers 50% commission payment and the start of TI work.
+   * If equal to leaseCommencement (the default for new scenarios), the model
+   * collapses to single-anchor behavior identical to the original spec.
+   */
+  leaseExecutionDate: string;
+  /**
+   * How many months the TI work takes. The TI allowance is paid out evenly
+   * across this many months starting at execution. 1 = single lump sum
+   * (the original spec behavior).
+   */
+  tiDurationMonths: number;
 }
 
 /** One row of the year-by-year rent schedule. */
@@ -65,18 +78,18 @@ export interface AnnualScheduleRow {
 
 /** One row of the month-by-month cash flow grid (all values PSF). */
 export interface MonthlyGridRow {
-  /** 1-indexed month number from lease commencement. */
+  /** 1-indexed month number from lease execution. */
   month: number;
   /** ISO date string for this month. */
   date: string;
   baseRentPSF: number;
-  /** Negative offset to base rent during free-rent period. */
+  /** Negative offset to base rent during free-rent period (NER bookkeeping). */
   freeRentPSF: number;
-  /** Negative — TI allowance, paid in month 1. */
+  /** Negative — TI draw spread across tiDurationMonths starting at execution. */
   tiPSF: number;
   /** Negative — leasing commission, timing depends on lcStructure. */
   lcPSF: number;
-  /** Sum of the four columns above. */
+  /** Sum of the four columns above (NER basis). */
   netCFPSF: number;
 }
 

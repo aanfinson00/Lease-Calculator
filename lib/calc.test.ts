@@ -22,6 +22,7 @@ const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
 
 // Inputs mirroring spec §12 Proposal: 300k SF, $8 PSF Yr1, 4% esc,
 // 10 PSF TI, 6 mo free, 130 mo term.
+// Default executionDate === commencement → calc collapses to original spec.
 const proposalInputs: ScenarioInputs = {
   name: "Proposal",
   projectSF: 300_000,
@@ -33,6 +34,8 @@ const proposalInputs: ScenarioInputs = {
   freeRentMonths: 6,
   leaseTermMonths: 130,
   leaseCommencement: "2025-01-01",
+  leaseExecutionDate: "2025-01-01",
+  tiDurationMonths: 1,
 };
 
 // Inputs mirroring spec §12 UW: 300k SF, $7 PSF, 3% esc,
@@ -48,6 +51,8 @@ const uwInputs: ScenarioInputs = {
   freeRentMonths: 4,
   leaseTermMonths: 125,
   leaseCommencement: "2025-01-01",
+  leaseExecutionDate: "2025-01-01",
+  tiDurationMonths: 1,
 };
 
 // ------------------------------------------------------------------------
@@ -309,7 +314,89 @@ describe("calcUndiscountedNER / calcDiscountedNER", () => {
       lcPSF: 0,
       netCFPSF: 0,
     }));
-    expect(calcUndiscountedNER(grid, 12)).toBe(0);
-    expect(calcDiscountedNER(grid, 0.08, 12)).toBe(0);
+    expect(calcUndiscountedNER(grid, 12, 12)).toBe(0);
+    expect(calcDiscountedNER(grid, 0.08, 12, 12)).toBe(0);
+  });
+});
+
+// ------------------------------------------------------------------------
+// Lease execution date + TI duration (new in v2)
+// ------------------------------------------------------------------------
+
+describe("lease execution date — commission split timing", () => {
+  it("execution === commencement preserves original split50 timing (half M1, half at RC)", () => {
+    const r = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const half = -r.totals.lcPSF / 2;
+    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
+    expect(r.grid[6].lcPSF).toBeCloseTo(half, 6); // free=6 → RC at month 7
+  });
+
+  it("execution before commencement pushes commission half #2 out further", () => {
+    // 3-month lead time; free=6. Half at execution (M1). Half at rent comm
+    // (M = offset + free + 1 = 3 + 6 + 1 = 10, grid index 9).
+    const r = runScenario(
+      { ...proposalInputs, leaseExecutionDate: "2024-10-01", leaseCommencement: "2025-01-01" },
+      makeGlobals({ lcStructure: "split50" }),
+    );
+    const half = -r.totals.lcPSF / 2;
+    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
+    expect(r.grid[9].lcPSF).toBeCloseTo(half, 6);
+  });
+
+  it("execution before commencement → discounted NER is LOWER than execution = commencement (later cash inflows discounted more)", () => {
+    const sameDay = runScenario(proposalInputs, makeGlobals({ lcStructure: "split50" }));
+    const earlySign = runScenario(
+      { ...proposalInputs, leaseExecutionDate: "2024-07-01", leaseCommencement: "2025-01-01" },
+      makeGlobals({ lcStructure: "split50" }),
+    );
+    expect(earlySign.discountedNER).toBeLessThan(sameDay.discountedNER);
+  });
+
+  it("execution after commencement is clamped to commencement (no negative offset)", () => {
+    const r = runScenario(
+      { ...proposalInputs, leaseExecutionDate: "2025-06-01", leaseCommencement: "2025-01-01" },
+      makeGlobals(),
+    );
+    // Should behave identically to executionDate === commencementDate.
+    const baseline = runScenario(proposalInputs, makeGlobals());
+    expect(r.undiscountedNER).toBeCloseTo(baseline.undiscountedNER, 6);
+  });
+});
+
+describe("TI duration — spread over months", () => {
+  it("default tiDuration=1 keeps all TI in month 1", () => {
+    const r = runScenario(proposalInputs, makeGlobals());
+    expect(r.grid[0].tiPSF).toBeCloseTo(-proposalInputs.tiAllowancePSF, 6);
+    expect(r.grid[1].tiPSF).toBe(0);
+  });
+
+  it("tiDuration=6 spreads TI evenly over 6 months", () => {
+    const r = runScenario(
+      { ...proposalInputs, tiDurationMonths: 6 },
+      makeGlobals(),
+    );
+    const perMonth = -proposalInputs.tiAllowancePSF / 6;
+    for (let i = 0; i < 6; i++) {
+      expect(r.grid[i].tiPSF).toBeCloseTo(perMonth, 6);
+    }
+    expect(r.grid[6].tiPSF).toBe(0);
+  });
+
+  it("total TI over the term is invariant to tiDurationMonths", () => {
+    const a = runScenario({ ...proposalInputs, tiDurationMonths: 1 }, makeGlobals());
+    const b = runScenario({ ...proposalInputs, tiDurationMonths: 12 }, makeGlobals());
+    expect(a.waterfall.ti).toBeCloseTo(b.waterfall.ti, 6);
+  });
+
+  it("undiscounted NER is invariant to tiDurationMonths (timing only)", () => {
+    const a = runScenario({ ...proposalInputs, tiDurationMonths: 1 }, makeGlobals());
+    const b = runScenario({ ...proposalInputs, tiDurationMonths: 6 }, makeGlobals());
+    expect(a.undiscountedNER).toBeCloseTo(b.undiscountedNER, 6);
+  });
+
+  it("discounted NER is HIGHER when TI is spread (deferred cost = less PV drag)", () => {
+    const a = runScenario({ ...proposalInputs, tiDurationMonths: 1 }, makeGlobals());
+    const b = runScenario({ ...proposalInputs, tiDurationMonths: 12 }, makeGlobals());
+    expect(b.discountedNER).toBeGreaterThan(a.discountedNER);
   });
 });

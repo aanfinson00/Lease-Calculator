@@ -22,6 +22,8 @@ const baseInputs: ScenarioInputs = {
   freeRentMonths: 6,
   leaseTermMonths: 130,
   leaseCommencement: "2025-01-01",
+  leaseExecutionDate: "2025-01-01",
+  tiDurationMonths: 1,
 };
 
 // Round-trip helper: pin scenario, compute NER, solve back for the chosen var.

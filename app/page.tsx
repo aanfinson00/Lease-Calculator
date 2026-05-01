@@ -6,6 +6,7 @@ import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
 import { AnnualSchedule } from "@/components/results/annual-schedule";
+import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
 import { MonthlyGrid } from "@/components/results/monthly-grid";
 import { WaterfallChart } from "@/components/results/waterfall-chart";
@@ -80,6 +81,10 @@ export default function Home() {
             aResults={aResults}
             bName={b.inputs.name}
             bResults={bResults}
+          />
+          <CashFlowSchedule
+            a={{ name: a.inputs.name, inputs: a.inputs, results: aResults }}
+            b={{ name: b.inputs.name, inputs: b.inputs, results: bResults }}
           />
           <MonthlyGrid
             aName={a.inputs.name}

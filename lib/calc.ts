@@ -90,9 +90,16 @@ export function calcLC(schedule: AnnualScheduleRow[], lcPercent: number): number
 /**
  * Build a month-by-month grid of PSF cash flows over the lease horizon.
  *
- * The grid extends to `globals.horizonMonths` (default 17 yrs / 204 mo);
- * months past the lease term are all zeros. This symmetry — every scenario
- * runs the same length — fixes one of the Excel's structural bugs.
+ * Origin: month 1 = lease execution date. If executionDate < commencementDate,
+ * the first `commencementOffset` months are pre-rent (TI draws, commission
+ * half #1 may land here). Free rent and base rent kick in at month
+ * `commencementOffset + 1`. If executionDate === commencementDate (the default
+ * for legacy scenarios), commencementOffset = 0 and the grid collapses to the
+ * original single-anchor behavior.
+ *
+ * The grid extends to `globals.horizonMonths` past execution; months past
+ * (commencementOffset + leaseTerm) are all zeros. This symmetry — every
+ * scenario runs the same length — fixes one of the Excel's structural bugs.
  */
 export function buildMonthlyGrid(
   inputs: ScenarioInputs,
@@ -100,12 +107,20 @@ export function buildMonthlyGrid(
   schedule: AnnualScheduleRow[],
   lcTotalPSF: number,
 ): MonthlyGridRow[] {
-  const horizon = Math.max(globals.horizonMonths, inputs.leaseTermMonths);
   const term = inputs.leaseTermMonths;
   const free = Math.min(Math.round(inputs.freeRentMonths), term);
 
-  // Build month → annualRatePSF lookup so each row resolves in O(1).
-  // The free-rent row contributes its months at rate $0; year 1 starts after.
+  const execution = new Date(inputs.leaseExecutionDate);
+  const commencement = new Date(inputs.leaseCommencement);
+  const commencementOffset = Math.max(0, monthsBetween(execution, commencement));
+
+  const tiDuration = Math.max(1, Math.round(inputs.tiDurationMonths));
+
+  const totalLeaseSpan = commencementOffset + term;
+  const horizon = Math.max(globals.horizonMonths, totalLeaseSpan);
+
+  // Lookup: monthFromCommencement (1-indexed) → annualRatePSF.
+  // Free-rent row contributes its months at rate $0; year 1 starts after.
   const monthToRate = new Array<number>(term).fill(0);
   let cursor = 0;
   for (const row of schedule) {
@@ -114,56 +129,50 @@ export function buildMonthlyGrid(
     }
   }
 
-  // Phantom rate for valuing free rent: rate that WOULD have been charged
-  // at month m if rent commenced immediately (no free period). This escalates
-  // on the same yearly cadence as the real schedule. Needed because Quirk #10
-  // in the spec — the Excel uses Yr1 monthly × free months as a shortcut,
-  // which is wrong when free rent crosses a year boundary.
-  const phantomRateForMonth = (m: number): number => {
-    const yearIndex = Math.floor((m - 1) / 12);
+  // Phantom rate for valuing free rent: the rate that WOULD have been
+  // charged in the corresponding lease year if rent commenced immediately
+  // (no free period). Escalates on the same yearly cadence as the real
+  // schedule. Quirk #10 fix: we use the actual year's rate, not Yr1's.
+  const phantomRateForMonth = (monthFromCommencement: number): number => {
+    const yearIndex = Math.floor((monthFromCommencement - 1) / 12);
     return inputs.baseRatePSF * Math.pow(1 + inputs.escalation, yearIndex);
   };
 
-  const commencement = new Date(inputs.leaseCommencement);
+  // LC payment timing — half at execution (m=1), half at rent commencement
+  // when split50; the full amount at execution when upfront.
+  const lcAtExecution = globals.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
+  const lcAtRC = globals.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
+  // 1-indexed month (from execution) where rent first kicks in:
+  const rcMonth = commencementOffset + free + 1;
 
-  // LC payment timing.
-  let lcMonth1 = 0;
-  let lcMonthRC = 0; // RC = rent commencement (month after free rent)
-  if (globals.lcStructure === "upfront") {
-    lcMonth1 = -lcTotalPSF;
-  } else {
-    // split50: half at execution (month 1), half at rent commencement
-    lcMonth1 = -lcTotalPSF / 2;
-    lcMonthRC = -lcTotalPSF / 2;
-  }
-  const rcMonth = free + 1; // 1-indexed month where rent first kicks in
+  const tiPerMonth = tiDuration > 0 ? -inputs.tiAllowancePSF / tiDuration : 0;
 
   const grid: MonthlyGridRow[] = [];
   for (let m = 1; m <= horizon; m++) {
-    const inTerm = m <= term;
-    const annualRate = inTerm ? monthToRate[m - 1] : 0;
-    // During free rent: no rent collected (baseRentPSF = 0), and the
-    // foregone rate at the would-be year's escalation goes into freeRentPSF.
-    // After free rent: real rate flows through baseRentPSF, freeRentPSF = 0.
-    const isFree = inTerm && m <= free;
+    const monthFromCommencement = m - commencementOffset; // 1-indexed during lease
+    const inLease = monthFromCommencement >= 1 && monthFromCommencement <= term;
+    const annualRate = inLease ? monthToRate[monthFromCommencement - 1] : 0;
+
+    const isFree = inLease && monthFromCommencement <= free;
     const baseRentPSF = isFree ? 0 : annualRate / 12;
-    const freeRentPSF = isFree ? -phantomRateForMonth(m) / 12 : 0;
-    const tiPSF = m === 1 ? -inputs.tiAllowancePSF : 0;
+    const freeRentPSF = isFree ? -phantomRateForMonth(monthFromCommencement) / 12 : 0;
+
+    // TI: spread evenly across tiDurationMonths starting at month 1 (execution).
+    const tiPSF = m >= 1 && m <= tiDuration ? tiPerMonth : 0;
 
     let lcPSF = 0;
-    if (m === 1) lcPSF += lcMonth1;
-    if (globals.lcStructure === "split50" && m === rcMonth && free > 0) {
-      lcPSF += lcMonthRC;
-    } else if (globals.lcStructure === "split50" && free === 0 && m === 1) {
-      // No free rent → both halves land in month 1, so add the second half here.
-      lcPSF += lcMonthRC;
-    }
+    if (m === 1) lcPSF += lcAtExecution;
+    if (m === rcMonth && lcAtRC !== 0 && rcMonth !== 1) lcPSF += lcAtRC;
+    // Edge case: execution = commencement AND no free rent → both LC halves
+    // collapse to month 1 (rcMonth === 1). The lcAtExecution already holds half;
+    // add the second half here to preserve the original lump-in-month-1 behavior.
+    if (m === 1 && rcMonth === 1 && lcAtRC !== 0) lcPSF += lcAtRC;
 
     const netCFPSF = baseRentPSF + freeRentPSF + tiPSF + lcPSF;
 
     grid.push({
       month: m,
-      date: addMonths(commencement, m - 1).toISOString().slice(0, 10),
+      date: addMonths(execution, m - 1).toISOString().slice(0, 10),
       baseRentPSF,
       freeRentPSF,
       tiPSF,
@@ -181,24 +190,47 @@ function addMonths(date: Date, months: number): Date {
   return d;
 }
 
+/** Whole-month difference (UTC, calendar-month boundary). */
+function monthsBetween(from: Date, to: Date): number {
+  return (
+    (to.getUTCFullYear() - from.getUTCFullYear()) * 12 +
+    (to.getUTCMonth() - from.getUTCMonth())
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 4. NER (undiscounted + discounted)
 // ---------------------------------------------------------------------------
 
-/** Sum a column of the monthly grid over the lease term. */
+/**
+ * Sum a column of the monthly grid over the first `span` months.
+ * `span` defaults to the grid length to preserve the simple two-arg call site.
+ */
 function sumColumn(
   grid: MonthlyGridRow[],
-  term: number,
+  span: number,
   key: keyof Pick<MonthlyGridRow, "baseRentPSF" | "freeRentPSF" | "tiPSF" | "lcPSF" | "netCFPSF">,
 ): number {
   let total = 0;
-  for (let i = 0; i < term && i < grid.length; i++) total += grid[i][key];
+  for (let i = 0; i < span && i < grid.length; i++) total += grid[i][key];
   return total;
 }
 
-export function calcUndiscountedNER(grid: MonthlyGridRow[], term: number): number {
+/**
+ * Undiscounted NER.
+ *
+ * `span` is how many months of grid to include in the sum (= commencement
+ * offset + lease term). `term` is the rent-paying lease term in months;
+ * NER is normalized per year over `term`. When execution === commencement
+ * the two are equal — original spec behavior.
+ */
+export function calcUndiscountedNER(
+  grid: MonthlyGridRow[],
+  span: number,
+  term: number,
+): number {
   if (term === 0) return 0;
-  const totalNetCF = sumColumn(grid, term, "netCFPSF");
+  const totalNetCF = sumColumn(grid, span, "netCFPSF");
   return (totalNetCF / term) * 12;
 }
 
@@ -208,17 +240,18 @@ export function calcUndiscountedNER(grid: MonthlyGridRow[], term: number): numbe
  * The Excel uses `NPV(rate, flows) + flow1` to compensate for `NPV()` discounting
  * the first cash flow by 1 period (off-by-one). We avoid that gotcha by computing
  * the PV ourselves with i starting at 0 — month 1 is discounted by 0 periods,
- * which is what we want since lease commencement IS period 0.
+ * which is what we want since lease execution IS period 0.
  */
 export function calcDiscountedNER(
   grid: MonthlyGridRow[],
   annualDiscountRate: number,
+  span: number,
   term: number,
 ): number {
   if (term === 0) return 0;
   const r = annualDiscountRate / 12; // monthly compounding
   let pv = 0;
-  for (let i = 0; i < term && i < grid.length; i++) {
+  for (let i = 0; i < span && i < grid.length; i++) {
     pv += grid[i].netCFPSF / Math.pow(1 + r, i);
   }
   return (pv / term) * 12;
@@ -255,8 +288,17 @@ export function runScenario(
   const grid = buildMonthlyGrid(inputs, globals, schedule, lcPSF);
   const term = inputs.leaseTermMonths;
 
-  const undiscountedNER = calcUndiscountedNER(grid, term);
-  const discountedNER = calcDiscountedNER(grid, globals.discountRate, term);
+  const execution = new Date(inputs.leaseExecutionDate);
+  const commencement = new Date(inputs.leaseCommencement);
+  const commencementOffset = Math.max(
+    0,
+    (commencement.getUTCFullYear() - execution.getUTCFullYear()) * 12 +
+      (commencement.getUTCMonth() - execution.getUTCMonth()),
+  );
+  const span = commencementOffset + term;
+
+  const undiscountedNER = calcUndiscountedNER(grid, span, term);
+  const discountedNER = calcDiscountedNER(grid, globals.discountRate, span, term);
 
   const buildingCostPSF = globals.shellCostPSF + inputs.tiAllowancePSF + lcPSF;
   const avgRatePSF = calcAvgRatePSF(schedule, term);
@@ -264,10 +306,10 @@ export function runScenario(
   const yocYr1 = buildingCostPSF > 0 ? inputs.baseRatePSF / buildingCostPSF : 0;
   const yocTerm = buildingCostPSF > 0 ? avgRatePSF / buildingCostPSF : 0;
 
-  const baseRent = sumColumn(grid, term, "baseRentPSF");
-  const freeRent = sumColumn(grid, term, "freeRentPSF"); // negative
-  const ti = sumColumn(grid, term, "tiPSF");             // negative
-  const lc = sumColumn(grid, term, "lcPSF");             // negative
+  const baseRent = sumColumn(grid, span, "baseRentPSF");
+  const freeRent = sumColumn(grid, span, "freeRentPSF"); // negative
+  const ti = sumColumn(grid, span, "tiPSF");             // negative
+  const lc = sumColumn(grid, span, "lcPSF");             // negative
   const netCashFlow = baseRent + freeRent + ti + lc;
 
   const waterfall: WaterfallComponents = { baseRent, freeRent, ti, lc, netCashFlow };
