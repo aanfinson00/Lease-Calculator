@@ -76,28 +76,39 @@ function annualRateForYear(inputs: ScenarioInputs, year: number): number {
 /**
  * Leasing commission total ($/SF over the term).
  *
- * Two calculation modes:
- *   tiered — full lcPercent on yrs 1-5 rent + lcPercent/2 on yrs 6+ rent
- *            (industrial standard; full LC on the first 60 months of
- *             contracted rent, half on month 61+).
- *   flat   — full lcPercent on rent across the entire term.
+ * Iterates the lease month-by-month, skips abated (free-rent) months
+ * entirely, and tiers on PAYING-month count:
+ *   tiered — full lcPercent on the first 60 paying months of contracted
+ *            rent, lcPercent/2 on month 61+ of paying rent.
+ *   flat   — full lcPercent on every paying month.
  *
- * "Rent collected in year Y" = annualRatePSF[Y] × monthsActive[Y] / 12.
- * With the calendar-aligned schedule, years 1-5 always cover months 1-60
- * exactly; year 6+ covers months 61 through end of term.
+ * Each paying month contributes (annualRateForYear / 12) where the year
+ * is the calendar lease year of that month. So with 6 mo free at the
+ * front of a 130-mo lease, tier 1 covers paying months 7-66 (mostly
+ * yrs 1-5 plus the first 6 mo of yr 6) and tier 2 covers paying months
+ * 67-130. Free rent NEVER counts toward the LC base.
  */
 export function calcLC(
-  schedule: AnnualScheduleRow[],
+  inputs: ScenarioInputs,
   lcPercent: number,
   calculation: LCCalculation = "tiered",
 ): number {
-  let tier1 = 0; // years 1-5  (months 1-60)
-  let tier2 = 0; // years 6+   (months 61+)
+  const term = inputs.leaseTermMonths;
+  const free = Math.max(0, Math.min(Math.round(inputs.freeRentMonths), term));
+  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
+  const freeEnd = Math.min(freeStart + free - 1, term);
 
-  for (const row of schedule) {
-    const rentPSF = row.annualRatePSF * (row.monthsActive / 12);
-    if (row.year <= 5) tier1 += rentPSF;
-    else tier2 += rentPSF;
+  let tier1 = 0; // first 60 paying months (full %)
+  let tier2 = 0; // paying months 61+      (half %)
+  let payingCount = 0;
+
+  for (let m = 1; m <= term; m++) {
+    if (m >= freeStart && m <= freeEnd) continue; // skip abated month
+    payingCount += 1;
+    const calendarYear = Math.floor((m - 1) / 12) + 1;
+    const monthlyRent = annualRateForYear(inputs, calendarYear) / 12;
+    if (payingCount <= 60) tier1 += monthlyRent;
+    else tier2 += monthlyRent;
   }
 
   if (calculation === "flat") return lcPercent * (tier1 + tier2);
@@ -321,7 +332,7 @@ export function runScenario(
 ): ScenarioResults {
   const schedule = buildAnnualSchedule(inputs);
   const totalLCPercent = inputs.lcLLRepPercent + inputs.lcTenantRepPercent;
-  const lcPSF = calcLC(schedule, totalLCPercent, inputs.lcCalculation);
+  const lcPSF = calcLC(inputs, totalLCPercent, inputs.lcCalculation);
   const grid = buildMonthlyGrid(inputs, globals, schedule, lcPSF);
   const term = inputs.leaseTermMonths;
 

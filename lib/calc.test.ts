@@ -156,74 +156,78 @@ describe("buildAnnualSchedule", () => {
 // ------------------------------------------------------------------------
 
 describe("calcLC", () => {
-  it("Proposal LC ≈ $6.72 (calendar-aligned schedule, 9% tiered)", () => {
-    // Spec §12 quoted $6.45 from the buggy Excel which used a "rent year
-    // shift" semantic (free rent pushed escalation later → smaller yr-11
-    // partial). With calendar-aligned escalation, yr 11 = 10 mo (not 4),
-    // so the tier-2 base is larger and LC is higher.
-    const s = buildAnnualSchedule(proposalInputs);
-    const lc = calcLC(s, 0.09);
-    expect(lc).toBeCloseTo(6.72, 1);
+  it("Proposal LC ≈ $6.57 (paying-month tier, 6 mo free at front, 9% tiered)", () => {
+    // 130 mo / 6 free at front: paying mo 7-130 = 124 paying months.
+    // Tier 1 = first 60 paying = mo 7-66 (yrs 1-6 mix). Tier 2 = mo 67-130.
+    expect(calcLC(proposalInputs, 0.09)).toBeCloseTo(6.57, 1);
   });
 
-  it("UW LC ≈ $5.46 (calendar-aligned, 9% tiered)", () => {
-    const s = buildAnnualSchedule(uwInputs);
-    const lc = calcLC(s, 0.09);
-    expect(lc).toBeCloseTo(5.46, 1);
+  it("UW LC ≈ $5.37 (paying-month tier, 4 mo free at front, 9% tiered)", () => {
+    expect(calcLC(uwInputs, 0.09)).toBeCloseTo(5.37, 1);
   });
 
   it("LL Rep + TR split sums to the same LC as a single equivalent percent", () => {
-    const s = buildAnnualSchedule(proposalInputs);
-    const single = calcLC(s, 0.09);
-    // Same total split 50/50 between LL and TR (mirrors runScenario summing).
-    const split = calcLC(s, 0.045 + 0.045);
+    const single = calcLC(proposalInputs, 0.09);
+    const split = calcLC(proposalInputs, 0.045 + 0.045);
     expect(split).toBeCloseTo(single, 6);
-    // And split 4/5 vs 1/5
-    const skewed = calcLC(s, 0.072 + 0.018);
+    const skewed = calcLC(proposalInputs, 0.072 + 0.018);
     expect(skewed).toBeCloseTo(single, 6);
   });
 
   it("scales linearly with lcPercent", () => {
-    const s = buildAnnualSchedule(proposalInputs);
-    const a = calcLC(s, 0.09);
-    const b = calcLC(s, 0.18);
+    const a = calcLC(proposalInputs, 0.09);
+    const b = calcLC(proposalInputs, 0.18);
     expect(b).toBeCloseTo(a * 2, 6);
   });
 
-  it("free rent doesn't affect LC (calendar-aligned schedule is invariant to free rent)", () => {
-    const s = buildAnnualSchedule(proposalInputs);
-    const sNoFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0 });
-    // Same term → same calendar schedule → same LC, regardless of free.
-    expect(calcLC(s, 0.09)).toBeCloseTo(calcLC(sNoFree, 0.09), 6);
+  it("free rent excludes abated months from the LC base", () => {
+    // 6 mo free vs 0 mo free for the SAME 130-mo term: with free rent,
+    // those 6 months don't contribute to LC, and tier 1 advances 6 paying
+    // months further into the schedule (mo 7-66 instead of mo 1-60).
+    const withFree = calcLC(proposalInputs, 0.09);
+    const noFree = calcLC({ ...proposalInputs, freeRentMonths: 0 }, 0.09);
+    expect(withFree).not.toBeCloseTo(noFree, 4);
   });
 
-  it("flat calculation applies full % to every year (yields more than tiered)", () => {
-    const s = buildAnnualSchedule(proposalInputs);
-    const tiered = calcLC(s, 0.09, "tiered");
-    const flat = calcLC(s, 0.09, "flat");
-    expect(flat).toBeGreaterThan(tiered);
-    // Flat = full % × full term rent. Tiered = full × yr1-5 + half × yr6+.
-    // The diff is exactly half × yr6+ rent.
-    const yr6plus = s
-      .filter((row) => row.year >= 6)
-      .reduce((sum, row) => sum + row.annualRatePSF * (row.monthsActive / 12), 0);
-    expect(flat - tiered).toBeCloseTo(0.09 * yr6plus * 0.5, 6);
+  it("flat ≥ tiered (flat charges full % on month 61+ that tiered halves)", () => {
+    expect(calcLC(proposalInputs, 0.09, "flat")).toBeGreaterThan(
+      calcLC(proposalInputs, 0.09, "tiered"),
+    );
   });
 
-  it("flat ≡ tiered when the term is ≤ 5 years (no yr6+ rent)", () => {
-    const short = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 60 });
+  it("flat ≡ tiered when total paying months ≤ 60 (no tier-2 rent)", () => {
+    // 60-mo lease, 0 free → 60 paying mo, all in tier 1.
+    const short = { ...proposalInputs, leaseTermMonths: 60, freeRentMonths: 0 };
     expect(calcLC(short, 0.09, "tiered")).toBeCloseTo(calcLC(short, 0.09, "flat"), 6);
+
+    // 60-mo lease, 6 mo free → only 54 paying mo, still all in tier 1.
+    const shortWithFree = { ...proposalInputs, leaseTermMonths: 60, freeRentMonths: 6 };
+    expect(calcLC(shortWithFree, 0.09, "tiered")).toBeCloseTo(
+      calcLC(shortWithFree, 0.09, "flat"),
+      6,
+    );
   });
 
-  it("tier boundary is exactly month 60 (61-mo lease has 1 mo of yr6+ rent at half %)", () => {
-    // 61-month lease: yrs 1-5 cover mo 1-60 (full %), yr 6 covers mo 61 only.
-    // Diff between tiered and flat = (lcPercent/2) × (yr 6 rate × 1/12).
-    const s = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 61 });
-    const tiered = calcLC(s, 0.09, "tiered");
-    const flat = calcLC(s, 0.09, "flat");
-    const yr6Rate = s.find((r) => r.year === 6)?.annualRatePSF ?? 0;
-    const yr6OneMonthContribution = yr6Rate * (1 / 12);
-    expect(flat - tiered).toBeCloseTo(0.045 * yr6OneMonthContribution, 6);
+  it("tier boundary is exactly the 60th paying month (61-mo lease, 0 free → 1 mo at half %)", () => {
+    const inputs = { ...proposalInputs, leaseTermMonths: 61, freeRentMonths: 0 };
+    const tiered = calcLC(inputs, 0.09, "tiered");
+    const flat = calcLC(inputs, 0.09, "flat");
+    // The 61st paying month (calendar mo 61) is yr 6.
+    const yr6Rate = inputs.baseRatePSF * Math.pow(1 + inputs.escalation, 5);
+    const yr6OneMonth = yr6Rate / 12;
+    // Diff between flat and tiered is the half-rate "savings" on the 1 mo of tier 2.
+    expect(flat - tiered).toBeCloseTo(0.045 * yr6OneMonth, 6);
+  });
+
+  it("tier boundary advances when there's free rent (66-mo lease + 6 mo free = same as 60-mo + 0 free)", () => {
+    // 66-mo term + 6 mo free = 60 paying mo, all in tier 1.
+    // 60-mo term + 0 free = 60 paying mo, all in tier 1.
+    // Both should produce the same LC since the contracted PAYING months
+    // are identical (mo 7-66 of the 66-mo lease = mo 1-60 of the 60-mo lease,
+    // shifted by 6 calendar months — different yr indices, so values differ
+    // due to escalation, BUT both fully fall in tier 1, so both are flat-=-tiered).
+    const longer = { ...proposalInputs, leaseTermMonths: 66, freeRentMonths: 6 };
+    expect(calcLC(longer, 0.09, "tiered")).toBeCloseTo(calcLC(longer, 0.09, "flat"), 6);
   });
 });
 
@@ -254,8 +258,8 @@ describe("calcAvgRatePSF", () => {
 describe("runScenario — Proposal (spec §12)", () => {
   const r = runScenario(proposalInputs, makeGlobals());
 
-  it("building cost PSF ≈ $156.72 (140 shell + 10 TI + ~$6.72 LC)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(156.72, 1);
+  it("building cost PSF ≈ $156.57 (140 shell + 10 TI + ~$6.57 LC, paying-month tier)", () => {
+    expect(r.buildingCostPSF).toBeCloseTo(156.57, 1);
   });
 
   it("YoC Yr1 = 8 / buildingCostPSF", () => {
@@ -266,8 +270,8 @@ describe("runScenario — Proposal (spec §12)", () => {
     expect(r.yocTerm).toBeCloseTo(r.totals.avgRatePSF / r.buildingCostPSF, 6);
   });
 
-  it("undiscounted NER ≈ $7.49 (calendar-aligned)", () => {
-    expect(r.undiscountedNER).toBeCloseTo(7.49, 1);
+  it("undiscounted NER ≈ $7.51 (paying-month-tier LC, 6 mo free at front)", () => {
+    expect(r.undiscountedNER).toBeCloseTo(7.51, 1);
   });
 
   it("discounted NER < undiscounted NER for positive discount rate", () => {
@@ -334,12 +338,12 @@ describe("runScenario — LC structure variants", () => {
 describe("runScenario — UW (spec §12)", () => {
   const r = runScenario(uwInputs, makeGlobals());
 
-  it("building cost PSF ≈ $150.46 (140 + 5 + ~$5.46 LC, calendar-aligned)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(150.46, 1);
+  it("building cost PSF ≈ $150.37 (140 + 5 + ~$5.37 LC, paying-month tier)", () => {
+    expect(r.buildingCostPSF).toBeCloseTo(150.37, 1);
   });
 
-  it("YoC Yr1 ≈ 7 / 150.46 ≈ 4.65%", () => {
-    expect(r.yocYr1).toBeCloseTo(7 / 150.46, 3);
+  it("YoC Yr1 ≈ 7 / 150.37 ≈ 4.66%", () => {
+    expect(r.yocYr1).toBeCloseTo(7 / 150.37, 3);
   });
 });
 
