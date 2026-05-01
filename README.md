@@ -9,7 +9,7 @@ each user's browser `localStorage`.
 
 ## Live URL
 
-> **TODO:** paste the Vercel URL here after the first deploy.
+**https://lease-calculator-lemon.vercel.app/**
 
 Coworkers bookmark the URL — nothing to install. Each user's data lives
 only in their own browser.
