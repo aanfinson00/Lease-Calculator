@@ -32,41 +32,56 @@ import type {
  * exhausted. The final year may be partial (`monthsActive < 12`).
  */
 export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[] {
-  const { baseRatePSF, leaseTermMonths } = inputs;
+  const { leaseTermMonths } = inputs;
   // Free rent is months in real life — round to handle solver's continuous
   // bisection (any fractional x maps to the same integer-month behavior).
   const freeRentMonths = Math.round(inputs.freeRentMonths);
+  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
+  const isFrontLoaded = freeStart === 1 && freeRentMonths > 0;
   const rows: AnnualScheduleRow[] = [];
 
-  // Year 0: free rent.
-  const freeMonths = Math.min(freeRentMonths, leaseTermMonths);
-  if (freeMonths > 0) {
+  // Year 0 (free rent) is only present for FRONT-LOADED abatement: rent years
+  // SHIFT to start after the abatement (Excel/spec semantics — rent yr 1
+  // begins at rent commencement, which is after the free period).
+  // For MID-TERM abatement, rent years run on the contract calendar — no
+  // year-0 row, year 1 = months 1-12 of the lease.
+  let remaining: number;
+  if (isFrontLoaded) {
+    const freeMonths = Math.min(freeRentMonths, leaseTermMonths);
     rows.push({ year: 0, annualRatePSF: 0, monthsActive: freeMonths });
+    remaining = leaseTermMonths - freeMonths;
+  } else {
+    remaining = leaseTermMonths;
   }
 
-  // Effective escalation applies a CPI collar: clamp to [floor, cap] if set.
-  // When neither is set, this is just `inputs.escalation`.
-  const effEsc = clamp(
-    inputs.escalation,
-    inputs.escalationFloor ?? Number.NEGATIVE_INFINITY,
-    inputs.escalationCap ?? Number.POSITIVE_INFINITY,
-  );
-
-  let remaining = leaseTermMonths - freeMonths;
   let year = 1;
   while (remaining > 0) {
     const monthsActive = Math.min(12, remaining);
-    const overrideRate = inputs.rentScheduleOverride?.[year - 1];
-    const annualRatePSF =
-      overrideRate != null && Number.isFinite(overrideRate)
-        ? overrideRate
-        : baseRatePSF * Math.pow(1 + effEsc, year - 1);
-    rows.push({ year, annualRatePSF, monthsActive });
+    rows.push({ year, annualRatePSF: annualRateForYear(inputs, year), monthsActive });
     remaining -= monthsActive;
     year += 1;
   }
 
   return rows;
+}
+
+/**
+ * Annual rate for lease year Y (1-indexed). Resolves in priority order:
+ *   1. Manual override (rentScheduleOverride[Y-1]) if set
+ *   2. Constant escalation, with the optional CPI collar applied to the rate
+ *
+ * Used by both buildAnnualSchedule (for LC + display) and buildMonthlyGrid
+ * (for per-month rate lookup, decoupled from the year-0 free-rent hack).
+ */
+function annualRateForYear(inputs: ScenarioInputs, year: number): number {
+  const override = inputs.rentScheduleOverride?.[year - 1];
+  if (override != null && Number.isFinite(override)) return override;
+  const effEsc = clamp(
+    inputs.escalation,
+    inputs.escalationFloor ?? Number.NEGATIVE_INFINITY,
+    inputs.escalationCap ?? Number.POSITIVE_INFINITY,
+  );
+  return inputs.baseRatePSF * Math.pow(1 + effEsc, year - 1);
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -136,6 +151,12 @@ export function buildMonthlyGrid(
   const term = inputs.leaseTermMonths;
   const free = Math.min(Math.round(inputs.freeRentMonths), term);
 
+  // Mid-term abatement window: 1-indexed from commencement. Defaults to 1
+  // (front-loaded), preserving original behavior. Clamp the window to fit
+  // inside the lease term.
+  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
+  const freeEnd = Math.min(freeStart + free - 1, term);
+
   const execution = new Date(inputs.leaseExecutionDate);
   const commencement = new Date(inputs.leaseCommencement);
   const commencementOffset = Math.max(0, monthsBetween(execution, commencement));
@@ -145,8 +166,12 @@ export function buildMonthlyGrid(
   const totalLeaseSpan = commencementOffset + term;
   const horizon = Math.max(globals.horizonMonths, totalLeaseSpan);
 
-  // Lookup: monthFromCommencement (1-indexed) → annualRatePSF.
-  // Free-rent row contributes its months at rate $0; year 1 starts after.
+  // Lookup: monthFromCommencement (1-indexed) → annualRatePSF, derived from
+  // the schedule's row layout. For front-loaded abatement, the schedule has
+  // a year-0 row of `freeRentMonths` zero-rate slots at the front, then years
+  // 1..N of paying-year rates ("rent years" shift after the abatement). For
+  // mid-term abatement, the schedule has no year-0 row — rent years align
+  // with the contract calendar (year 1 = months 1-12 of lease).
   const monthToRate = new Array<number>(term).fill(0);
   let cursor = 0;
   for (const row of schedule) {
@@ -155,21 +180,25 @@ export function buildMonthlyGrid(
     }
   }
 
-  // Phantom rate for valuing free rent: the rate that WOULD have been
-  // charged in the corresponding lease year if rent commenced immediately
-  // (no free period). Escalates on the same yearly cadence as the real
-  // schedule. Quirk #10 fix: we use the actual year's rate, not Yr1's.
+  // Phantom rate for valuing free rent: the rate that WOULD be charged in
+  // the corresponding calendar lease year. Calendar-indexed (not schedule-
+  // indexed), so it's correct for both front-loaded and mid-term abatement.
+  // Quirk #10 fix: uses the actual year's rate, not Yr1's.
   const phantomRateForMonth = (monthFromCommencement: number): number => {
-    const yearIndex = Math.floor((monthFromCommencement - 1) / 12);
-    return inputs.baseRatePSF * Math.pow(1 + inputs.escalation, yearIndex);
+    const calendarYear = Math.floor((monthFromCommencement - 1) / 12) + 1;
+    return annualRateForYear(inputs, calendarYear);
   };
 
   // LC payment timing — half at execution (m=1), half at rent commencement
   // when split50; the full amount at execution when upfront.
   const lcAtExecution = globals.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
   const lcAtRC = globals.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
-  // 1-indexed month (from execution) where rent first kicks in:
-  const rcMonth = commencementOffset + free + 1;
+  // 1-indexed month (from execution) where rent collection first kicks in.
+  // Front-loaded free rent (start === 1, free > 0) pushes rent commencement
+  // out by `free` months; a mid-term abatement leaves rent starting at the
+  // lease commencement.
+  const rcOffset = freeStart === 1 ? free : 0;
+  const rcMonth = commencementOffset + rcOffset + 1;
 
   const tiPerMonth = tiDuration > 0 ? -inputs.tiAllowancePSF / tiDuration : 0;
 
@@ -179,7 +208,8 @@ export function buildMonthlyGrid(
     const inLease = monthFromCommencement >= 1 && monthFromCommencement <= term;
     const annualRate = inLease ? monthToRate[monthFromCommencement - 1] : 0;
 
-    const isFree = inLease && monthFromCommencement <= free;
+    const isFree =
+      inLease && monthFromCommencement >= freeStart && monthFromCommencement <= freeEnd;
     const baseRentPSF = isFree ? 0 : annualRate / 12;
     const freeRentPSF = isFree ? -phantomRateForMonth(monthFromCommencement) / 12 : 0;
 

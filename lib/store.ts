@@ -226,7 +226,7 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 4,
+      version: 5,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -235,6 +235,8 @@ export const useAppStore = create<AppStore>()(
       // v3 → v4: scenarios gain optional escalationFloor / escalationCap /
       //          rentScheduleOverride. All optional with no-op defaults; the
       //          version bump alone forces a re-hydration so types match.
+      // v4 → v5: scenarios gain optional freeRentStartMonth (default 1, which
+      //          preserves the original front-loaded abatement behavior).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -256,6 +258,16 @@ export const useAppStore = create<AppStore>()(
             lcCalculation:
               (state.globals as Partial<Globals>).lcCalculation ?? "tiered",
           };
+        }
+        if (state && version < 5 && state.scenarios) {
+          state.scenarios = state.scenarios.map((sc) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              freeRentStartMonth:
+                (sc.inputs as Partial<ScenarioInputs>).freeRentStartMonth ?? 1,
+            },
+          }));
         }
         return state as unknown as PersistedState;
       },

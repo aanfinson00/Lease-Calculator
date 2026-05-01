@@ -59,7 +59,13 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
   );
   const offset = Math.max(0, commencementOffset);
   const free = Math.max(0, Math.min(Math.round(inputs.freeRentMonths), inputs.leaseTermMonths));
-  const rcMonth = offset + free + 1;
+  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
+  const freeEnd = Math.min(freeStart + free - 1, inputs.leaseTermMonths);
+  // Front-loaded abatement defers rent commencement; mid-term abatement leaves
+  // it at lease commencement.
+  const rcMonth = offset + (freeStart === 1 ? free : 0) + 1;
+  const abatementStartMonth = free > 0 ? offset + freeStart : null;
+  const abatementEndMonth = free > 0 ? offset + freeEnd : null;
   const span = offset + inputs.leaseTermMonths;
   const rows = results.grid.slice(0, span);
 
@@ -81,7 +87,8 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
         <span className="font-semibold">{name}</span>
         <span className="text-[var(--color-muted-foreground)]">
           Execution {inputs.leaseExecutionDate} · Commencement {inputs.leaseCommencement}
-          {free > 0 && ` · Rent Comm. M${rcMonth}`}
+          {free > 0 && freeStart === 1 && ` · Rent Comm. M${rcMonth}`}
+          {free > 0 && freeStart > 1 && ` · Free M${abatementStartMonth}–M${abatementEndMonth}`}
           {" · "}
           {sf.toLocaleString("en-US")} SF
         </span>
@@ -94,21 +101,35 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
                 Month
               </th>
               {rows.map((r, i) => {
-                const isExecution = i === 0;
-                const isCommencement = i + 1 === offset + 1 && offset > 0;
-                const isRentStart = i + 1 === rcMonth && free > 0;
+                const m = i + 1;
+                const isExecution = m === 1;
+                const isCommencement = m === offset + 1 && offset > 0;
+                // "Rent" marker only meaningful when front-loaded abatement
+                // delays rent commencement; for mid-term abatements the
+                // abatement window itself is marked instead.
+                const isRentStart = m === rcMonth && free > 0 && freeStart === 1;
+                const isFreeStart =
+                  abatementStartMonth != null && m === abatementStartMonth && freeStart > 1;
                 const marker = isExecution
                   ? { label: "Exec", color: "var(--color-primary)" }
                   : isCommencement
                     ? { label: "Comm", color: "var(--color-muted-foreground)" }
                     : isRentStart
                       ? { label: "Rent", color: "var(--color-success)" }
-                      : null;
+                      : isFreeStart
+                        ? { label: "Free", color: "var(--color-cost)" }
+                        : null;
+                const inAbatement =
+                  abatementStartMonth != null &&
+                  abatementEndMonth != null &&
+                  m >= abatementStartMonth &&
+                  m <= abatementEndMonth;
                 return (
                   <th
                     key={i}
                     className={cellBorder(i + 1, offset, rcMonth, free) +
-                      " min-w-[64px] px-2 py-1 text-right font-medium"}
+                      " min-w-[64px] px-2 py-1 text-right font-medium" +
+                      (inAbatement ? " bg-[var(--color-cost)]/5" : "")}
                   >
                     <div>M{r.month}</div>
                     {marker && (
