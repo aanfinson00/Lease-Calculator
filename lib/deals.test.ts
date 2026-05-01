@@ -104,9 +104,11 @@ describe("dealAsScenarioPatch", () => {
     expect(patch.tiDurationMonths).toBe(1);
   });
 
-  it("splits the deal's LC into Landlord Rep + Tenant Rep, 50/50", () => {
-    expect(patch.lcLLRepPercent).toBe(0.03);
-    expect(patch.lcTenantRepPercent).toBe(0.03);
+  it("splits the deal's LC into Landlord Rep + Tenant Rep, 1/3 LL + 2/3 TR", () => {
+    // Deal01-4-01 has LCs = 0.06; expected split: LL = 0.02, TR = 0.04
+    expect(patch.lcLLRepPercent).toBeCloseTo(0.02, 10);
+    expect(patch.lcTenantRepPercent).toBeCloseTo(0.04, 10);
+    // Combined total preserved exactly (subtraction guarantees no drift)
     expect((patch.lcLLRepPercent ?? 0) + (patch.lcTenantRepPercent ?? 0)).toBe(0.06);
   });
 
