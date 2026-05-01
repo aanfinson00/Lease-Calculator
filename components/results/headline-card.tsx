@@ -51,13 +51,13 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       format: "currency",
     },
     {
-      label: "YoC · Year 1",
+      label: "Yield on Cost · Yr 1",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       format: "percent",
     },
     {
-      label: "YoC · Term",
+      label: "Yield on Cost · Term",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       format: "percent",

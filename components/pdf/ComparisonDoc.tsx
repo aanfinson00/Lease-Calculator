@@ -205,14 +205,14 @@ export function ComparisonDoc({
       delta: bResults.discountedNER - aResults.discountedNER,
     },
     {
-      label: "YoC (Year 1)",
+      label: "Yield on Cost (Yr 1)",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       fmt: (v: number) => fmtPercent(v, 2),
       delta: bResults.yocYr1 - aResults.yocYr1,
     },
     {
-      label: "YoC (Term)",
+      label: "Yield on Cost (Term)",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       fmt: (v: number) => fmtPercent(v, 2),
@@ -272,7 +272,7 @@ export function ComparisonDoc({
                   r.delta > 0 ? styles.positive : r.delta < 0 ? styles.negative : {},
                 ]}
               >
-                {r.label.includes("YoC") ? fmtPercent(r.delta, 2) : fmtSigned(r.delta, 2)}
+                {r.label.includes("Yield") ? fmtPercent(r.delta, 2) : fmtSigned(r.delta, 2)}
               </Text>
             </View>
           ))}

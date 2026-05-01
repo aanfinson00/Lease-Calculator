@@ -133,7 +133,7 @@ function DealAssumptions() {
           />
         </Stack>
         <Stack
-          label={`LL Rep (%) · total ${(((globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100).toFixed(2))}%`}
+          label={`Landlord Rep (%) · total ${(((globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100).toFixed(2))}%`}
         >
           <Input
             type="number"
@@ -143,7 +143,7 @@ function DealAssumptions() {
             onChange={(e) => update({ lcLLRepPercent: Number(e.target.value) / 100 })}
           />
         </Stack>
-        <Stack label="TR (%)">
+        <Stack label="Tenant Rep (%)">
           <Input
             type="number"
             step={0.1}
