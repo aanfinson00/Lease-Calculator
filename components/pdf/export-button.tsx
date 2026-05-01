@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { runScenario } from "@/lib/calc";
 import { useAppStore } from "@/lib/store";
+import { toast } from "@/lib/toast";
 
 /**
  * Triggers a client-side PDF download of the current comparison view.
@@ -53,6 +54,9 @@ export function ExportPdfButton() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      toast("PDF downloaded", "success");
+    } catch (e) {
+      toast(`PDF export failed: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
       setBusy(false);
     }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { dealAsScenarioPatch, parseDeals, type Deal } from "@/lib/deals";
 import { useAppStore } from "@/lib/store";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 /**
@@ -91,23 +92,33 @@ export function DealPicker({
     }
     setOpen(false);
     setQuery("");
+    toast(`Loaded ${deal.code} (${deal.dealName})`, "success");
   };
 
   const handleFile = (file: File) => {
     setParseError(null);
     const reader = new FileReader();
-    reader.onerror = () => setParseError("Couldn't read the file.");
+    reader.onerror = () => {
+      const msg = "Couldn't read the file.";
+      setParseError(msg);
+      toast(msg, "error");
+    };
     reader.onload = () => {
       try {
         const text = String(reader.result ?? "");
         const parsed = parseDeals(text);
         if (parsed.length === 0) {
-          setParseError("No deal rows found in the file.");
+          const msg = "No deal rows found in the file.";
+          setParseError(msg);
+          toast(msg, "error");
           return;
         }
         setDeals(parsed);
+        toast(`Loaded ${parsed.length} deals`, "success");
       } catch (e) {
-        setParseError(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        setParseError(msg);
+        toast(`CSV parse failed: ${msg}`, "error");
       }
     };
     reader.readAsText(file);
@@ -265,9 +276,13 @@ export function DealPicker({
                     type="button"
                     className="font-medium text-[var(--color-destructive)] hover:underline"
                     onClick={() => {
-                      clearDeals();
-                      setQuery("");
-                      setParseError(null);
+                      const n = deals.length;
+                      if (window.confirm(`Clear all ${n} loaded deals from this browser?`)) {
+                        clearDeals();
+                        setQuery("");
+                        setParseError(null);
+                        toast("Deals cleared", "info");
+                      }
                     }}
                   >
                     Clear

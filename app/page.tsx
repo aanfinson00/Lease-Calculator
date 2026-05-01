@@ -5,6 +5,7 @@ import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Toaster } from "@/components/ui/toaster";
 import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
@@ -111,6 +112,7 @@ export default function Home() {
       )}
 
       <SensitivityPanel />
+      <Toaster />
     </div>
   );
 }

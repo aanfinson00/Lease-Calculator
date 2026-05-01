@@ -80,7 +80,11 @@ export function ScenarioBar() {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 text-[var(--color-destructive)] hover:bg-[var(--color-destructive)]/10"
-                  onClick={() => deleteScenario(sc.id)}
+                  onClick={() => {
+                    if (window.confirm(`Delete scenario "${sc.inputs.name}"? This can't be undone.`)) {
+                      deleteScenario(sc.id);
+                    }
+                  }}
                   aria-label="Delete"
                   disabled={scenarios.length <= 1}
                 >

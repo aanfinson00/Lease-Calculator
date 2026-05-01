@@ -1,0 +1,109 @@
+/**
+ * Scenario validation — pure check that returns soft warnings about the
+ * inputs. The calc engine accepts any input and silently clamps where it
+ * has to (free rent > term, execution > commencement, etc.); these
+ * warnings give the user a heads-up that the model auto-corrected.
+ *
+ * Severity:
+ *   "warn" — semantic issue or value got clamped; the displayed result
+ *            doesn't reflect what the user typed.
+ *   "info" — unusual but legal; just a sanity check.
+ *
+ * No errors are returned — there's no concept of "invalid input" here.
+ * The calc engine is total.
+ */
+
+import type { ScenarioInputs } from "./types";
+
+export type WarningSeverity = "warn" | "info";
+
+export interface Warning {
+  /** Which input field this attaches to (for inline icon placement). */
+  field: keyof ScenarioInputs;
+  severity: WarningSeverity;
+  message: string;
+}
+
+export function validateScenario(inputs: ScenarioInputs): Warning[] {
+  const out: Warning[] = [];
+
+  // -- Hard semantic warns (calc engine clamps these) ---------------------
+
+  if (inputs.freeRentMonths > inputs.leaseTermMonths) {
+    out.push({
+      field: "freeRentMonths",
+      severity: "warn",
+      message: `Free rent (${Math.round(inputs.freeRentMonths)} mo) exceeds the lease term (${inputs.leaseTermMonths} mo). Calc clamps to the term.`,
+    });
+  }
+
+  const exec = new Date(inputs.leaseExecutionDate);
+  const comm = new Date(inputs.leaseCommencement);
+  if (Number.isFinite(exec.getTime()) && Number.isFinite(comm.getTime()) && exec > comm) {
+    out.push({
+      field: "leaseExecutionDate",
+      severity: "warn",
+      message: "Execution date is after commencement. Calc clamps the gap to zero.",
+    });
+  }
+
+  if (inputs.baseRatePSF <= 0) {
+    out.push({
+      field: "baseRatePSF",
+      severity: "warn",
+      message: "Base rate is zero or negative.",
+    });
+  }
+
+  if (inputs.proposedLeaseSF > inputs.buildingSF) {
+    out.push({
+      field: "proposedLeaseSF",
+      severity: "warn",
+      message: "Lease SF exceeds building SF.",
+    });
+  }
+
+  if (inputs.buildingSF > inputs.projectSF) {
+    out.push({
+      field: "buildingSF",
+      severity: "warn",
+      message: "Building SF exceeds project SF.",
+    });
+  }
+
+  // -- Soft "this looks unusual" infos -------------------------------------
+
+  const totalLC = inputs.lcLLRepPercent + inputs.lcTenantRepPercent;
+  if (totalLC > 0.15) {
+    out.push({
+      field: "lcLLRepPercent",
+      severity: "info",
+      message: `Combined LC ${(totalLC * 100).toFixed(2)}% is unusually high (typical industrial range 6-12%).`,
+    });
+  }
+
+  if (inputs.tiDurationMonths > 24) {
+    out.push({
+      field: "tiDurationMonths",
+      severity: "info",
+      message: "TI duration exceeds 24 months — verify the construction schedule.",
+    });
+  }
+
+  if (inputs.leaseTermMonths < 12) {
+    out.push({
+      field: "leaseTermMonths",
+      severity: "info",
+      message: "Lease term is under 12 months.",
+    });
+  }
+  if (inputs.leaseTermMonths > 240) {
+    out.push({
+      field: "leaseTermMonths",
+      severity: "info",
+      message: "Lease term exceeds 20 years — verify.",
+    });
+  }
+
+  return out;
+}

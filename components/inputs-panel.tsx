@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormattedNumberInput, type NumberFormat } from "@/components/ui/formatted-number-input";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
@@ -8,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAppStore } from "@/lib/store";
 import type { ScenarioInputs } from "@/lib/types";
+import { validateScenario, type Warning } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 
 interface FieldDef {
   /** Required for editable fields; omitted for derived (computed) fields. */
@@ -151,6 +154,13 @@ export function InputsPanel() {
     { id: bId, name: b.inputs.name, inputs: b.inputs },
   ];
 
+  // Warnings per scenario, used both for inline cell icons and the
+  // consolidated strip below the sections.
+  const warningsByScenario: Record<string, Warning[]> = {
+    [aId]: validateScenario(a.inputs),
+    [bId]: validateScenario(b.inputs),
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -159,10 +169,58 @@ export function InputsPanel() {
       <CardContent className="flex flex-col divide-y">
         <DealAssumptions />
         {SECTIONS.map((section) => (
-          <Section key={section.title} section={section} scenarios={scenarios} />
+          <Section
+            key={section.title}
+            section={section}
+            scenarios={scenarios}
+            warningsByScenario={warningsByScenario}
+          />
         ))}
+        <WarningStrip scenarios={scenarios} warningsByScenario={warningsByScenario} />
       </CardContent>
     </Card>
+  );
+}
+
+function WarningStrip({
+  scenarios,
+  warningsByScenario,
+}: {
+  scenarios: Array<{ id: string; name: string }>;
+  warningsByScenario: Record<string, Warning[]>;
+}) {
+  const items = scenarios.flatMap((sc) =>
+    warningsByScenario[sc.id]!.map((w) => ({ scenarioName: sc.name, w })),
+  );
+  if (items.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1 py-3 last:pb-0">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+        Notices
+      </div>
+      <ul className="flex flex-col gap-1">
+        {items.map(({ scenarioName, w }, i) => (
+          <li
+            key={`${scenarioName}-${w.field}-${i}`}
+            className={cn(
+              "flex items-start gap-1.5 text-xs",
+              w.severity === "warn"
+                ? "text-[var(--color-cost)]"
+                : "text-[var(--color-muted-foreground)]",
+            )}
+          >
+            {w.severity === "warn" ? (
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+            ) : (
+              <Info className="mt-0.5 size-3.5 shrink-0" />
+            )}
+            <span>
+              <span className="font-medium">{scenarioName}:</span> {w.message}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -216,9 +274,10 @@ function Stack({ label, children }: { label: string; children: React.ReactNode }
 interface SectionProps {
   section: SectionDef;
   scenarios: Array<{ id: string; name: string; inputs: ScenarioInputs }>;
+  warningsByScenario: Record<string, Warning[]>;
 }
 
-function Section({ section, scenarios }: SectionProps) {
+function Section({ section, scenarios, warningsByScenario }: SectionProps) {
   // 1 label column + N field columns. Inline style because Tailwind can't
   // produce a class for an arbitrary repeat count at build time.
   const cols = section.fields.length;
@@ -245,21 +304,25 @@ function Section({ section, scenarios }: SectionProps) {
       </div>
 
       {/* One row per scenario */}
-      {scenarios.map((sc) => (
-        <div key={sc.id} className="grid items-center gap-2" style={gridStyle}>
-          <div className="truncate text-sm font-medium" title={sc.name}>
-            {sc.name}
+      {scenarios.map((sc) => {
+        const scenarioWarnings = warningsByScenario[sc.id] ?? [];
+        return (
+          <div key={sc.id} className="grid items-center gap-2" style={gridStyle}>
+            <div className="truncate text-sm font-medium" title={sc.name}>
+              {sc.name}
+            </div>
+            {section.fields.map((f, idx) => (
+              <Cell
+                key={fieldKey(f, idx)}
+                field={f}
+                scenarioId={sc.id}
+                inputs={sc.inputs}
+                warning={f.field ? scenarioWarnings.find((w) => w.field === f.field) : undefined}
+              />
+            ))}
           </div>
-          {section.fields.map((f, idx) => (
-            <Cell
-              key={fieldKey(f, idx)}
-              field={f}
-              scenarioId={sc.id}
-              inputs={sc.inputs}
-            />
-          ))}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -272,9 +335,10 @@ interface CellProps {
   field: FieldDef;
   scenarioId: string;
   inputs: ScenarioInputs;
+  warning?: Warning;
 }
 
-function Cell({ field, scenarioId, inputs }: CellProps) {
+function Cell({ field, scenarioId, inputs, warning }: CellProps) {
   const updateInput = useAppStore((s) => s.updateInput);
 
   // Derived/read-only cell — computed from current inputs, can't be edited.
@@ -320,25 +384,74 @@ function Cell({ field, scenarioId, inputs }: CellProps) {
   // Date field — plain text input, no formatting.
   if (field.type === "date") {
     return (
-      <Input
-        type="date"
-        value={String(inputs[key] ?? "")}
-        onChange={(e) => updateInput(scenarioId, key, e.target.value as never)}
-        className="h-8 px-2 text-sm"
-      />
+      <CellWrapper warning={warning}>
+        <Input
+          type="date"
+          value={String(inputs[key] ?? "")}
+          onChange={(e) => updateInput(scenarioId, key, e.target.value as never)}
+          className="h-8 px-2 text-sm"
+        />
+      </CellWrapper>
     );
   }
 
   // Numeric input with focus-aware formatting.
   const raw = inputs[key];
   return (
-    <FormattedNumberInput
-      value={typeof raw === "number" ? raw : undefined}
-      onChange={(v) => updateInput(scenarioId, key, (v as unknown) as never)}
-      format={field.format}
-      percent={field.percent ?? false}
-      optional={field.optional ?? false}
-      placeholder={field.optional ? "—" : undefined}
-    />
+    <CellWrapper warning={warning}>
+      <FormattedNumberInput
+        value={typeof raw === "number" ? raw : undefined}
+        onChange={(v) => updateInput(scenarioId, key, (v as unknown) as never)}
+        format={field.format}
+        percent={field.percent ?? false}
+        optional={field.optional ?? false}
+        placeholder={field.optional ? "—" : undefined}
+      />
+    </CellWrapper>
+  );
+}
+
+/**
+ * Wraps an input with a small `!` indicator when the field has a warning.
+ * The icon hovers (focus too) to reveal the message via HelpTooltip.
+ */
+function CellWrapper({
+  warning,
+  children,
+}: {
+  warning: Warning | undefined;
+  children: React.ReactNode;
+}) {
+  if (!warning) return <>{children}</>;
+  const isWarn = warning.severity === "warn";
+  const Icon = isWarn ? TriangleAlert : Info;
+  const colorClass = isWarn ? "text-[var(--color-cost)]" : "text-[var(--color-muted-foreground)]";
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex-1">{children}</div>
+      <span className="group/help relative inline-flex items-center">
+        <button
+          type="button"
+          tabIndex={0}
+          aria-label={warning.message}
+          className={cn(
+            "inline-flex size-3.5 items-center justify-center rounded-full focus:outline-none",
+            colorClass,
+          )}
+        >
+          <Icon className="size-3.5" />
+        </button>
+        <span
+          role="tooltip"
+          className={cn(
+            "pointer-events-none invisible absolute right-0 top-full z-30 mt-1 w-64 rounded-md border bg-[var(--color-card)] p-2 text-[11px] leading-tight text-[var(--color-foreground)] shadow-md opacity-0 transition-opacity",
+            "group-hover/help:visible group-hover/help:opacity-100",
+            "group-focus-within/help:visible group-focus-within/help:opacity-100",
+          )}
+        >
+          {warning.message}
+        </span>
+      </span>
+    </div>
   );
 }
