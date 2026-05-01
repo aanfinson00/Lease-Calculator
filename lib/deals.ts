@@ -9,7 +9,9 @@
  *   Code              → code (search key + audit trail)
  *   Deal Name         → dealName (displayed)
  *   Tenant Name       → tenantName (displayed)
- *   Square Feet       → squareFeet
+ *   Project SF        → projectSF
+ *   Building SF       → buildingSF
+ *   Lease SF          → leaseSF
  *   Trended Rent      → baseRatePSF (rate at lease start)
  *   Rent Escalations  → escalation (in-lease escalator)
  *   Lease Term        → leaseTermMonths
@@ -30,7 +32,9 @@ export interface Deal {
   code: string;
   dealName: string;
   tenantName: string;
-  squareFeet: number;
+  projectSF: number;
+  buildingSF: number;
+  leaseSF: number;
   baseRatePSF: number;
   escalation: number;
   leaseTermMonths: number;
@@ -58,7 +62,9 @@ export function parseDeals(csv: string): Deal[] {
   const cCode = idx("Code");
   const cDealName = idx("Deal Name");
   const cTenant = idx("Tenant Name");
-  const cSqFt = idx("Square Feet");
+  const cProjectSF = idx("Project SF");
+  const cBuildingSF = idx("Building SF");
+  const cLeaseSF = idx("Lease SF");
   const cTrended = idx("Trended Rent");
   const cEsc = idx("Rent Escalations");
   const cTerm = idx("Lease Term");
@@ -78,7 +84,9 @@ export function parseDeals(csv: string): Deal[] {
       code: (cols[cCode] ?? "").trim(),
       dealName: (cols[cDealName] ?? "").trim(),
       tenantName: (cols[cTenant] ?? "").trim(),
-      squareFeet: int(cols[cSqFt]),
+      projectSF: int(cols[cProjectSF]),
+      buildingSF: int(cols[cBuildingSF]),
+      leaseSF: int(cols[cLeaseSF]),
       baseRatePSF: num(cols[cTrended]),
       escalation: num(cols[cEsc]),
       leaseTermMonths: int(cols[cTerm]),
@@ -141,17 +149,14 @@ export function loadDeals(): Promise<Deal[]> {
  * Returns the partial ScenarioInputs that should overwrite the scenario when
  * the user picks this deal. The caller merges this onto existing inputs and
  * also writes `globals.lc{LL,Tenant}RepPercent` from `effectiveLCSplit(deal)`.
- *
- * SF: the CSV has only one Square Feet column, so all three SF fields get
- * the same value. The user can adjust afterward (e.g. lease SF < building SF).
  */
 export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
   return {
     name: deal.code,
     dealCode: deal.code,
-    projectSF: deal.squareFeet,
-    buildingSF: deal.squareFeet,
-    proposedLeaseSF: deal.squareFeet,
+    projectSF: deal.projectSF,
+    buildingSF: deal.buildingSF,
+    proposedLeaseSF: deal.leaseSF,
     baseRatePSF: deal.baseRatePSF,
     escalation: deal.escalation,
     leaseTermMonths: deal.leaseTermMonths,

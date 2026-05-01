@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { dealAsScenarioPatch, dealLCSplit, parseDeals, parseUSDate } from "./deals";
 
 const HEADER =
-  "Code,Deal Name,Tenant Name,Square Feet,Untrended Rent,Trended Rent,Annual Growth,Lease Term,Start Month Post Completion,Starting Month,Start Month (Date),Free Rent (months),TIs,LCs,LC Override,Rent Escalations,MLA,Status";
+  "Code,Deal Name,Tenant Name,Project SF,Building SF,Lease SF,Untrended Rent,Trended Rent,Annual Growth,Lease Term,Start Month Post Completion,Starting Month,Start Month (Date),Free Rent (months),TIs,LCs,LC Override,Rent Escalations,MLA,Status";
 
 const ROW_LEASE =
-  "Deal01-4-01,Deal 01,Tenant 002,540726,11.22,11.22,0,84,0,33,5/15/2026,3,8.11,0.06,0,0.035,Global,LEASE";
+  "Deal01-4-01,Deal 01,Tenant 002,800000,650000,540726,11.22,11.22,0,84,0,33,5/15/2026,3,8.11,0.06,0,0.035,Global,LEASE";
 const ROW_OVERRIDE =
-  "Deal01-1-02,Deal 01,Tenant 006,46290,15.09,16.3,0.0335,84,6,54,10/19/2026,3,0,0,0.015,0.03,Global,SPEC";
+  "Deal01-1-02,Deal 01,Tenant 006,46290,46290,46290,15.09,16.3,0.0335,84,6,54,10/19/2026,3,0,0,0.015,0.03,Global,SPEC";
 const ROW_BOTH_LC_AND_OVERRIDE =
-  "Deal03-1-03,Deal 03,Tenant 020,358606,15.83,15.83,0.0159,84,9,58,7/31/2024,9,7.69,0.04,0.017,0.03,Global,LEASE";
+  "Deal03-1-03,Deal 03,Tenant 020,400000,400000,358606,15.83,15.83,0.0159,84,9,58,7/31/2024,9,7.69,0.04,0.017,0.03,Global,LEASE";
 
 describe("parseUSDate", () => {
   it("converts M/D/YYYY → YYYY-MM-DD", () => {
@@ -36,7 +36,9 @@ describe("parseDeals", () => {
     expect(d.code).toBe("Deal01-4-01");
     expect(d.dealName).toBe("Deal 01");
     expect(d.tenantName).toBe("Tenant 002");
-    expect(d.squareFeet).toBe(540726);
+    expect(d.projectSF).toBe(800000);
+    expect(d.buildingSF).toBe(650000);
+    expect(d.leaseSF).toBe(540726);
     expect(d.baseRatePSF).toBe(11.22);
     expect(d.escalation).toBe(0.035);
     expect(d.leaseTermMonths).toBe(84);
@@ -78,9 +80,9 @@ describe("dealAsScenarioPatch", () => {
   const deal = parseDeals(csv)[0]!;
   const patch = dealAsScenarioPatch(deal);
 
-  it("fans Square Feet to project / building / lease SF", () => {
-    expect(patch.projectSF).toBe(540726);
-    expect(patch.buildingSF).toBe(540726);
+  it("maps the three SF columns separately to project / building / lease SF", () => {
+    expect(patch.projectSF).toBe(800000);
+    expect(patch.buildingSF).toBe(650000);
     expect(patch.proposedLeaseSF).toBe(540726);
   });
 

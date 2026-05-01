@@ -213,7 +213,7 @@ export function DealPicker({
                       {d.dealName} · {d.tenantName}
                     </span>
                     <span className="tabular-nums whitespace-nowrap">
-                      {d.squareFeet.toLocaleString("en-US")} SF
+                      {d.leaseSF.toLocaleString("en-US")} SF
                     </span>
                   </div>
                 </li>
