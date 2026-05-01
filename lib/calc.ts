@@ -31,29 +31,20 @@ import type {
  * Greedy month allocation: free rent first, then 12 mo/yr until the term is
  * exhausted. The final year may be partial (`monthsActive < 12`).
  */
+/**
+ * Build the year-by-year rent schedule.
+ *
+ * Calendar-aligned: Year 1 covers months 1-12 of the lease, Year 2 covers
+ * months 13-24, and so on. Escalation always lands on the calendar
+ * anniversary, regardless of where free rent sits. Free rent doesn't
+ * "push escalation back" — it abates whatever rate is in effect during
+ * the free months. The grid handles abatement separately via an isFree
+ * flag, so the schedule has no special "year 0" row.
+ */
 export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[] {
   const { leaseTermMonths } = inputs;
-  // Free rent is months in real life — round to handle solver's continuous
-  // bisection (any fractional x maps to the same integer-month behavior).
-  const freeRentMonths = Math.round(inputs.freeRentMonths);
-  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
-  const isFrontLoaded = freeStart === 1 && freeRentMonths > 0;
   const rows: AnnualScheduleRow[] = [];
-
-  // Year 0 (free rent) is only present for FRONT-LOADED abatement: rent years
-  // SHIFT to start after the abatement (Excel/spec semantics — rent yr 1
-  // begins at rent commencement, which is after the free period).
-  // For MID-TERM abatement, rent years run on the contract calendar — no
-  // year-0 row, year 1 = months 1-12 of the lease.
-  let remaining: number;
-  if (isFrontLoaded) {
-    const freeMonths = Math.min(freeRentMonths, leaseTermMonths);
-    rows.push({ year: 0, annualRatePSF: 0, monthsActive: freeMonths });
-    remaining = leaseTermMonths - freeMonths;
-  } else {
-    remaining = leaseTermMonths;
-  }
-
+  let remaining = leaseTermMonths;
   let year = 1;
   while (remaining > 0) {
     const monthsActive = Math.min(12, remaining);
@@ -61,7 +52,6 @@ export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[]
     remaining -= monthsActive;
     year += 1;
   }
-
   return rows;
 }
 

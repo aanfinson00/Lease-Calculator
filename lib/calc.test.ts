@@ -66,35 +66,30 @@ const uwInputs: ScenarioInputs = {
 // ------------------------------------------------------------------------
 
 describe("buildAnnualSchedule", () => {
-  it("creates a free-rent row + escalating year rows for 130mo / 6mo free", () => {
+  it("calendar-aligned: yr 1 = mo 1-12, escalation always lands at the 12-month anniversary regardless of free rent", () => {
     const s = buildAnnualSchedule(proposalInputs);
-    // 6 free + 12*10 + 4 = 130 → 1 free row + 10 full years + 1 partial year
-    expect(s).toHaveLength(12);
-    expect(s[0]).toEqual({ year: 0, annualRatePSF: 0, monthsActive: 6 });
-    expect(s[1]).toEqual({ year: 1, annualRatePSF: 8, monthsActive: 12 });
-    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.04, 6);
-    expect(s[10].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 9), 6);
-    expect(s[11]).toEqual({
+    // 130 mo → 10 full years + 1 partial (10 mo). No "year 0" row; free rent
+    // is a grid-level flag, not a schedule shift.
+    expect(s).toHaveLength(11);
+    expect(s[0]).toEqual({ year: 1, annualRatePSF: 8, monthsActive: 12 });
+    expect(s[1].annualRatePSF).toBeCloseTo(8 * 1.04, 6);
+    expect(s[9].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 9), 6);
+    expect(s[10]).toEqual({
       year: 11,
       annualRatePSF: 8 * Math.pow(1.04, 10),
-      monthsActive: 4,
+      monthsActive: 10,
     });
-    // Total months covered === leaseTermMonths
     expect(s.reduce((sum, r) => sum + r.monthsActive, 0)).toBe(130);
   });
 
-  it("handles 0 free rent", () => {
-    const s = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0 });
-    expect(s[0]).toEqual({ year: 1, annualRatePSF: 8, monthsActive: 12 });
-    expect(s.reduce((sum, r) => sum + r.monthsActive, 0)).toBe(130);
-  });
-
-  it("handles free rent > 12 months (crosses year boundary)", () => {
-    const s = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 18 });
-    // Free rent row gets 18 mo; but we model that as one year-0 row of 18.
-    // Remaining = 130 - 18 = 112 → 9 full years + 4 mo partial.
-    expect(s[0]).toEqual({ year: 0, annualRatePSF: 0, monthsActive: 18 });
-    expect(s.reduce((sum, r) => sum + r.monthsActive, 0)).toBe(130);
+  it("schedule shape is invariant to free-rent count or location", () => {
+    const noFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0 });
+    const someFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 6 });
+    const lotsOfFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 18 });
+    const midTerm = buildAnnualSchedule({ ...proposalInputs, freeRentStartMonth: 13 });
+    expect(noFree).toEqual(someFree);
+    expect(noFree).toEqual(lotsOfFree);
+    expect(noFree).toEqual(midTerm);
   });
 
   it("handles partial final year (term not divisible by 12)", () => {
@@ -107,9 +102,9 @@ describe("buildAnnualSchedule", () => {
     });
   });
 
-  it("handles term equal to free rent (no paying months)", () => {
+  it("term equal to free rent: schedule still shows yr 1 contracted at full rate (free is grid-only)", () => {
     const s = buildAnnualSchedule({ ...proposalInputs, leaseTermMonths: 6 });
-    expect(s).toEqual([{ year: 0, annualRatePSF: 0, monthsActive: 6 }]);
+    expect(s).toEqual([{ year: 1, annualRatePSF: 8, monthsActive: 6 }]);
   });
 
   // ---- Step rent + CPI collar (Phase A) ----
@@ -119,13 +114,13 @@ describe("buildAnnualSchedule", () => {
       ...proposalInputs,
       rentScheduleOverride: [null, null, null, null, null, 12.5], // override yr 6 only
     });
-    // Yr 1-5 untouched (formula)
-    expect(s[1].annualRatePSF).toBeCloseTo(8, 6);
-    expect(s[5].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 4), 6);
+    // Yr 1-5 untouched (formula). Schedule is calendar-aligned: s[0] is yr 1.
+    expect(s[0].annualRatePSF).toBeCloseTo(8, 6);                       // yr 1
+    expect(s[4].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 4), 6);   // yr 5
     // Yr 6 overridden
-    expect(s[6].annualRatePSF).toBeCloseTo(12.5, 6);
+    expect(s[5].annualRatePSF).toBeCloseTo(12.5, 6);
     // Yr 7+ continues from the formula curve (NOT compounded from override)
-    expect(s[7].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 6), 6);
+    expect(s[6].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 6), 6);
   });
 
   it("override leaves non-overridden years on the formula", () => {
@@ -133,10 +128,10 @@ describe("buildAnnualSchedule", () => {
       ...proposalInputs,
       rentScheduleOverride: [null, null, 99], // override yr 3 only
     });
-    expect(s[3].annualRatePSF).toBe(99);
+    expect(s[2].annualRatePSF).toBe(99);                                // yr 3
     // Years before and after still on the formula
-    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.04, 6);
-    expect(s[4].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 3), 6);
+    expect(s[1].annualRatePSF).toBeCloseTo(8 * 1.04, 6);                // yr 2
+    expect(s[3].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 3), 6);   // yr 4
   });
 
   it("YoC Yr1 reflects a year-1 override (regression)", () => {
@@ -161,20 +156,20 @@ describe("buildAnnualSchedule", () => {
 // ------------------------------------------------------------------------
 
 describe("calcLC", () => {
-  it("matches the spec validation target for Proposal (~$6.45 at 9% LC)", () => {
+  it("Proposal LC ≈ $6.72 (calendar-aligned schedule, 9% tiered)", () => {
+    // Spec §12 quoted $6.45 from the buggy Excel which used a "rent year
+    // shift" semantic (free rent pushed escalation later → smaller yr-11
+    // partial). With calendar-aligned escalation, yr 11 = 10 mo (not 4),
+    // so the tier-2 base is larger and LC is higher.
     const s = buildAnnualSchedule(proposalInputs);
     const lc = calcLC(s, 0.09);
-    // Rough validation against spec §12 — spec target is $6.45
-    expect(lc).toBeCloseTo(6.45, 1);
+    expect(lc).toBeCloseTo(6.72, 1);
   });
 
-  it("UW LC ≈ $5.32 (regression baseline)", () => {
-    // Spec §12 says $6.25, but that target reflects Excel Quirk #1 —
-    // UW side truncates schedule at year 10 in the Excel, distorting LC.
-    // Our symmetric calc gives the correct $5.32 for 125mo / 4 free / 3% esc.
+  it("UW LC ≈ $5.46 (calendar-aligned, 9% tiered)", () => {
     const s = buildAnnualSchedule(uwInputs);
     const lc = calcLC(s, 0.09);
-    expect(lc).toBeCloseTo(5.32, 2);
+    expect(lc).toBeCloseTo(5.46, 1);
   });
 
   it("LL Rep + TR split sums to the same LC as a single equivalent percent", () => {
@@ -195,10 +190,10 @@ describe("calcLC", () => {
     expect(b).toBeCloseTo(a * 2, 6);
   });
 
-  it("excludes the free-rent row (it's $0 anyway, but explicitly)", () => {
+  it("free rent doesn't affect LC (calendar-aligned schedule is invariant to free rent)", () => {
     const s = buildAnnualSchedule(proposalInputs);
-    const sNoFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0, leaseTermMonths: 124 });
-    // Same paying months → same LC
+    const sNoFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0 });
+    // Same term → same calendar schedule → same LC, regardless of free.
     expect(calcLC(s, 0.09)).toBeCloseTo(calcLC(sNoFree, 0.09), 6);
   });
 
@@ -226,18 +221,18 @@ describe("calcLC", () => {
 // ------------------------------------------------------------------------
 
 describe("calcAvgRatePSF", () => {
-  it("matches spec validation target for Proposal (~$9.00)", () => {
+  it("Proposal avg rate ≈ $9.78 (calendar-aligned)", () => {
+    // Calendar-aligned schedule weights yr 11 with 10 mo (not 4), so the
+    // weighted average climbs vs the prior shifted-rent-year semantic.
     const s = buildAnnualSchedule(proposalInputs);
     const avg = calcAvgRatePSF(s, proposalInputs.leaseTermMonths);
-    expect(avg).toBeCloseTo(9.0, 0);
+    expect(avg).toBeCloseTo(9.78, 1);
   });
 
-  it("UW avg rate ≈ $7.78 (regression baseline)", () => {
-    // Spec §12 says $9.11; same Quirk #1 root cause — Excel UW truncates
-    // schedule. Our value is correct: 972.4 rent-mo-PSF / 125 mo = $7.78/yr.
+  it("UW avg rate ≈ $8.08 (calendar-aligned)", () => {
     const s = buildAnnualSchedule(uwInputs);
     const avg = calcAvgRatePSF(s, uwInputs.leaseTermMonths);
-    expect(avg).toBeCloseTo(7.78, 1);
+    expect(avg).toBeCloseTo(8.08, 1);
   });
 });
 
@@ -248,8 +243,8 @@ describe("calcAvgRatePSF", () => {
 describe("runScenario — Proposal (spec §12)", () => {
   const r = runScenario(proposalInputs, makeGlobals());
 
-  it("building cost PSF ≈ $156 (140 shell + 10 TI + ~6.45 LC)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(156.45, 1);
+  it("building cost PSF ≈ $156.72 (140 shell + 10 TI + ~$6.72 LC)", () => {
+    expect(r.buildingCostPSF).toBeCloseTo(156.72, 1);
   });
 
   it("YoC Yr1 = 8 / buildingCostPSF", () => {
@@ -260,8 +255,8 @@ describe("runScenario — Proposal (spec §12)", () => {
     expect(r.yocTerm).toBeCloseTo(r.totals.avgRatePSF / r.buildingCostPSF, 6);
   });
 
-  it("undiscounted NER ≈ $7.34 (matches spec §12 Proposal target)", () => {
-    expect(r.undiscountedNER).toBeCloseTo(7.34, 1);
+  it("undiscounted NER ≈ $7.49 (calendar-aligned)", () => {
+    expect(r.undiscountedNER).toBeCloseTo(7.49, 1);
   });
 
   it("discounted NER < undiscounted NER for positive discount rate", () => {
@@ -328,12 +323,12 @@ describe("runScenario — LC structure variants", () => {
 describe("runScenario — UW (spec §12)", () => {
   const r = runScenario(uwInputs, makeGlobals());
 
-  it("building cost PSF ≈ $150.32 (140 + 5 + ~5.32 LC; see Quirk #1)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(150.32, 1);
+  it("building cost PSF ≈ $150.46 (140 + 5 + ~$5.46 LC, calendar-aligned)", () => {
+    expect(r.buildingCostPSF).toBeCloseTo(150.46, 1);
   });
 
-  it("YoC Yr1 ≈ 7 / 150.32 ≈ 4.66%", () => {
-    expect(r.yocYr1).toBeCloseTo(0.0466, 3);
+  it("YoC Yr1 ≈ 7 / 150.46 ≈ 4.65%", () => {
+    expect(r.yocYr1).toBeCloseTo(7 / 150.46, 3);
   });
 });
 
