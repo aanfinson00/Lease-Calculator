@@ -68,7 +68,7 @@ export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[]
 /**
  * Annual rate for lease year Y (1-indexed). Resolves in priority order:
  *   1. Manual override (rentScheduleOverride[Y-1]) if set
- *   2. Constant escalation, with the optional CPI collar applied to the rate
+ *   2. Constant escalation: baseRatePSF × (1 + escalation)^(Y-1)
  *
  * Used by both buildAnnualSchedule (for LC + display) and buildMonthlyGrid
  * (for per-month rate lookup, decoupled from the year-0 free-rent hack).
@@ -76,16 +76,7 @@ export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[]
 function annualRateForYear(inputs: ScenarioInputs, year: number): number {
   const override = inputs.rentScheduleOverride?.[year - 1];
   if (override != null && Number.isFinite(override)) return override;
-  const effEsc = clamp(
-    inputs.escalation,
-    inputs.escalationFloor ?? Number.NEGATIVE_INFINITY,
-    inputs.escalationCap ?? Number.POSITIVE_INFINITY,
-  );
-  return inputs.baseRatePSF * Math.pow(1 + effEsc, year - 1);
-}
-
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.min(Math.max(v, lo), hi);
+  return inputs.baseRatePSF * Math.pow(1 + inputs.escalation, year - 1);
 }
 
 // ---------------------------------------------------------------------------

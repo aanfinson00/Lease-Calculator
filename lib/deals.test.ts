@@ -98,10 +98,8 @@ describe("dealAsScenarioPatch", () => {
     expect(patch.leaseExecutionDate).toBe(patch.leaseCommencement);
   });
 
-  it("clears prior overrides + collar to start clean", () => {
+  it("clears prior overrides so the loaded deal is on the formula", () => {
     expect(patch.rentScheduleOverride).toBeUndefined();
-    expect(patch.escalationFloor).toBeUndefined();
-    expect(patch.escalationCap).toBeUndefined();
     expect(patch.freeRentStartMonth).toBe(1);
     expect(patch.tiDurationMonths).toBe(1);
   });

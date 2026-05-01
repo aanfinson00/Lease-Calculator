@@ -144,11 +144,9 @@ export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
     leaseExecutionDate: deal.commencement,
     freeRentMonths: deal.freeRentMonths,
     tiAllowancePSF: deal.tiAllowancePSF,
-    // Clear any prior step-rent override / collar so the loaded deal is
-    // calculated from the formula until the user customizes again.
+    // Clear any prior step-rent override so the loaded deal is calculated
+    // from the formula until the user customizes again.
     rentScheduleOverride: undefined,
-    escalationFloor: undefined,
-    escalationCap: undefined,
     freeRentStartMonth: 1,
     tiDurationMonths: 1,
   };

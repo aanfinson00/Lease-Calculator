@@ -124,41 +124,15 @@ describe("buildAnnualSchedule", () => {
     expect(s[7].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 6), 6);
   });
 
-  it("escalationCap clamps a high escalation rate", () => {
-    // 4% nominal escalation, capped at 2% → all years use 2%
-    const s = buildAnnualSchedule({ ...proposalInputs, escalationCap: 0.02 });
-    expect(s[1].annualRatePSF).toBeCloseTo(8, 6);                       // yr 1 = base
-    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.02, 6);                // yr 2 = base × 1.02
-    expect(s[5].annualRatePSF).toBeCloseTo(8 * Math.pow(1.02, 4), 6);   // yr 5
-  });
-
-  it("escalationFloor clamps a low escalation rate", () => {
-    // 4% nominal, floored at 6% → all years use 6%
-    const s = buildAnnualSchedule({ ...proposalInputs, escalationFloor: 0.06 });
-    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.06, 6);
-  });
-
-  it("escalation collar with cap === floor === escalation is a no-op", () => {
-    const baseline = buildAnnualSchedule(proposalInputs);
-    const collared = buildAnnualSchedule({
-      ...proposalInputs,
-      escalationFloor: 0.04,
-      escalationCap: 0.04,
-    });
-    for (let i = 0; i < baseline.length; i++) {
-      expect(collared[i].annualRatePSF).toBeCloseTo(baseline[i].annualRatePSF, 6);
-    }
-  });
-
-  it("override + collar together: override wins for that year", () => {
+  it("override leaves non-overridden years on the formula", () => {
     const s = buildAnnualSchedule({
       ...proposalInputs,
-      escalationCap: 0.02,                 // would clamp formula years
-      rentScheduleOverride: [null, null, 99], // but yr 3 is forced to 99
+      rentScheduleOverride: [null, null, 99], // override yr 3 only
     });
     expect(s[3].annualRatePSF).toBe(99);
-    // Other years still under the cap
-    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.02, 6);
+    // Years before and after still on the formula
+    expect(s[2].annualRatePSF).toBeCloseTo(8 * 1.04, 6);
+    expect(s[4].annualRatePSF).toBeCloseTo(8 * Math.pow(1.04, 3), 6);
   });
 });
 

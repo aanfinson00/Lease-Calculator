@@ -48,7 +48,7 @@ export function RentSchedule({ a, b }: Props) {
         <CardContent>
           <p className="pb-3 text-xs text-[var(--color-muted-foreground)]">
             Each cell is the rate for that lease year. Edit to override; clear or click reset to revert to the
-            formula <code className="font-mono">Base × (1 + Esc)<sup>y−1</sup></code>, clamped by Floor/Cap if set.
+            formula <code className="font-mono">Base × (1 + Esc)<sup>y−1</sup></code>.
           </p>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm tabular-nums">
@@ -201,8 +201,5 @@ function yearsFor(inputs: ScenarioInputs): number {
 }
 
 function formulaRateFor(inputs: ScenarioInputs, year: number): number {
-  const lo = inputs.escalationFloor ?? Number.NEGATIVE_INFINITY;
-  const hi = inputs.escalationCap ?? Number.POSITIVE_INFINITY;
-  const eff = Math.min(Math.max(inputs.escalation, lo), hi);
-  return inputs.baseRatePSF * Math.pow(1 + eff, year - 1);
+  return inputs.baseRatePSF * Math.pow(1 + inputs.escalation, year - 1);
 }

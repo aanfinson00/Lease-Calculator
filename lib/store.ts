@@ -242,7 +242,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 8,
+      version: 9,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -264,6 +264,8 @@ export const useAppStore = create<AppStore>()(
       //          CSV. Backfill empty array — the deals.csv file used to live
       //          in the repo; users now upload it in the browser, so
       //          previously-loaded data simply isn't there.
+      // v8 → v9: drop scenarios.{escalationFloor, escalationCap} (CPI collar
+      //          removed from the model — the fields are dead).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -317,6 +319,18 @@ export const useAppStore = create<AppStore>()(
         }
         if (state && version < 8 && !Array.isArray(state.deals)) {
           state.deals = [];
+        }
+        if (state && version < 9 && state.scenarios) {
+          state.scenarios = state.scenarios.map((sc) => {
+            const { escalationFloor: _f, escalationCap: _c, ...rest } =
+              sc.inputs as ScenarioInputs & {
+                escalationFloor?: number;
+                escalationCap?: number;
+              };
+            void _f;
+            void _c;
+            return { ...sc, inputs: rest };
+          });
         }
         return state as unknown as PersistedState;
       },

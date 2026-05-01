@@ -37,8 +37,6 @@ const SECTIONS: SectionDef[] = [
     fields: [
       { field: "baseRatePSF", label: "Base Rate ($/SF)", step: 0.01 },
       { field: "escalation", label: "Escalation (%)", step: 0.1, percent: true },
-      { field: "escalationFloor", label: "Floor (%)", step: 0.1, percent: true, optional: true },
-      { field: "escalationCap", label: "Cap (%)", step: 0.1, percent: true, optional: true },
     ],
   },
   {
