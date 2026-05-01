@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormattedNumberInput, type NumberFormat } from "@/components/ui/formatted-number-input";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +13,13 @@ interface FieldDef {
   /** Required for editable fields; omitted for derived (computed) fields. */
   field?: keyof ScenarioInputs;
   label: string;
-  step?: number;
   type?: "number" | "date" | "text";
   /** Stored as a fraction (0.03), rendered as a percent (3.00). */
   percent?: boolean;
   /** Optional fields render empty when undefined and clearing → undefined. */
   optional?: boolean;
+  /** Display format when the cell isn't focused (commas / $ / %). */
+  format?: NumberFormat;
   /** When set, the cell renders as a read-only computed value. */
   compute?: (inputs: ScenarioInputs) => number;
   /** How to render the computed value. */
@@ -37,31 +39,31 @@ const SECTIONS: SectionDef[] = [
   {
     title: "Square Footage",
     fields: [
-      { field: "projectSF", label: "Project SF" },
-      { field: "buildingSF", label: "Building SF" },
-      { field: "proposedLeaseSF", label: "Lease SF" },
+      { field: "projectSF", label: "Project SF", format: "sf" },
+      { field: "buildingSF", label: "Building SF", format: "sf" },
+      { field: "proposedLeaseSF", label: "Lease SF", format: "sf" },
     ],
   },
   {
     title: "Rent",
     fields: [
-      { field: "baseRatePSF", label: "Base Rate ($/SF)", step: 0.01 },
-      { field: "escalation", label: "Escalation (%)", step: 0.1, percent: true },
+      { field: "baseRatePSF", label: "Base Rate ($/SF)", format: "currency" },
+      { field: "escalation", label: "Escalation (%)", percent: true, format: "percent" },
     ],
   },
   {
     title: "Concessions",
     fields: [
-      { field: "tiAllowancePSF", label: "TI Allowance ($/SF)", step: 0.5 },
-      { field: "tiDurationMonths", label: "TI Duration (mo)", step: 1 },
-      { field: "freeRentMonths", label: "Free Rent (mo)", step: 1 },
+      { field: "tiAllowancePSF", label: "TI Allowance ($/SF)", format: "currency" },
+      { field: "tiDurationMonths", label: "TI Duration (mo)", format: "integer" },
+      { field: "freeRentMonths", label: "Free Rent (mo)", format: "integer" },
     ],
   },
   {
     title: "Leasing Commissions",
     fields: [
-      { field: "lcLLRepPercent", label: "Landlord Rep (%)", step: 0.01, percent: true },
-      { field: "lcTenantRepPercent", label: "Tenant Rep (%)", step: 0.01, percent: true },
+      { field: "lcLLRepPercent", label: "Landlord Rep (%)", percent: true, format: "percent" },
+      { field: "lcTenantRepPercent", label: "Tenant Rep (%)", percent: true, format: "percent" },
       {
         label: "Combined (%)",
         compute: (i) => (i.lcLLRepPercent + i.lcTenantRepPercent) * 100,
@@ -115,7 +117,7 @@ const SECTIONS: SectionDef[] = [
   {
     title: "Term",
     fields: [
-      { field: "leaseTermMonths", label: "Term (mo)", step: 1 },
+      { field: "leaseTermMonths", label: "Term (mo)", format: "integer" },
       { field: "leaseExecutionDate", label: "Execution", type: "date" },
       { field: "leaseCommencement", label: "Commencement", type: "date" },
     ],
@@ -179,21 +181,18 @@ function DealAssumptions() {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Stack label="Shell ($/SF)">
-          <Input
-            type="number"
-            step={0.01}
-            className="h-8 px-2 text-sm"
+          <FormattedNumberInput
             value={globals.shellCostPSF}
-            onChange={(e) => update({ shellCostPSF: Number(e.target.value) })}
+            onChange={(v) => update({ shellCostPSF: v ?? 0 })}
+            format="currency"
           />
         </Stack>
         <Stack label="Discount (%)">
-          <Input
-            type="number"
-            step={0.1}
-            className="h-8 px-2 text-sm"
-            value={(globals.discountRate * 100).toFixed(2)}
-            onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
+          <FormattedNumberInput
+            value={globals.discountRate}
+            onChange={(v) => update({ discountRate: v ?? 0 })}
+            format="percent"
+            percent
           />
         </Stack>
       </div>
@@ -317,39 +316,29 @@ function Cell({ field, scenarioId, inputs }: CellProps) {
 
   const key = field.field;
   if (!key) return null; // unreachable: editable field requires `field` set
-  const { type = "number", step = 1, percent = false, optional = false } = field;
 
-  const renderValue = (): string => {
-    const raw = inputs[key];
-    if (raw == null) return "";
-    if (percent && typeof raw === "number") return (raw * 100).toFixed(2);
-    if (typeof raw === "number") return String(raw);
-    return String(raw);
-  };
+  // Date field — plain text input, no formatting.
+  if (field.type === "date") {
+    return (
+      <Input
+        type="date"
+        value={String(inputs[key] ?? "")}
+        onChange={(e) => updateInput(scenarioId, key, e.target.value as never)}
+        className="h-8 px-2 text-sm"
+      />
+    );
+  }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (optional && raw === "") {
-      updateInput(scenarioId, key, undefined as never);
-      return;
-    }
-    if (type === "date" || (typeof inputs[key] === "string" && !percent)) {
-      updateInput(scenarioId, key, raw as never);
-      return;
-    }
-    const num = Number(raw);
-    const stored = percent ? num / 100 : num;
-    updateInput(scenarioId, key, stored as never);
-  };
-
+  // Numeric input with focus-aware formatting.
+  const raw = inputs[key];
   return (
-    <Input
-      type={type}
-      step={step}
-      value={renderValue()}
-      onChange={handleChange}
-      placeholder={optional ? "—" : undefined}
-      className="h-8 px-2 text-sm"
+    <FormattedNumberInput
+      value={typeof raw === "number" ? raw : undefined}
+      onChange={(v) => updateInput(scenarioId, key, (v as unknown) as never)}
+      format={field.format}
+      percent={field.percent ?? false}
+      optional={field.optional ?? false}
+      placeholder={field.optional ? "—" : undefined}
     />
   );
 }
