@@ -5,7 +5,8 @@ import type { Globals, ScenarioInputs } from "./types";
 
 const baseGlobals: Globals = {
   discountRate: 0.08,
-  lcPercent: 0.09,
+  lcLLRepPercent: 0.045,
+  lcTenantRepPercent: 0.045,
   shellCostPSF: 140,
   lcStructure: "upfront",
   lcCalculation: "tiered",

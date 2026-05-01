@@ -115,7 +115,7 @@ function DealAssumptions() {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
         Deal Assumptions · shared
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <Stack label="Shell ($/SF)">
           <Input
             type="number"
@@ -134,13 +134,24 @@ function DealAssumptions() {
             onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
           />
         </Stack>
-        <Stack label="LC (%)">
+        <Stack
+          label={`LL Rep (%) · total ${(((globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100).toFixed(2))}%`}
+        >
           <Input
             type="number"
             step={0.1}
             className="h-8 px-2 text-sm"
-            value={(globals.lcPercent * 100).toFixed(2)}
-            onChange={(e) => update({ lcPercent: Number(e.target.value) / 100 })}
+            value={(globals.lcLLRepPercent * 100).toFixed(2)}
+            onChange={(e) => update({ lcLLRepPercent: Number(e.target.value) / 100 })}
+          />
+        </Stack>
+        <Stack label="TR (%)">
+          <Input
+            type="number"
+            step={0.1}
+            className="h-8 px-2 text-sm"
+            value={(globals.lcTenantRepPercent * 100).toFixed(2)}
+            onChange={(e) => update({ lcTenantRepPercent: Number(e.target.value) / 100 })}
           />
         </Stack>
         <Stack label="LC Calc">

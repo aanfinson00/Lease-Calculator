@@ -19,8 +19,10 @@ export type LCCalculation = "tiered" | "flat";
 export interface Globals {
   /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
   discountRate: number;
-  /** Leasing commission rate on rent, decimal (0.09 = 9%). */
-  lcPercent: number;
+  /** Landlord-rep brokerage commission rate, decimal. */
+  lcLLRepPercent: number;
+  /** Tenant-rep brokerage commission rate, decimal. */
+  lcTenantRepPercent: number;
   /** Building shell cost PSF, $ — replaces the Excel hardcoded $140. */
   shellCostPSF: number;
   /** How LC payments are timed. */

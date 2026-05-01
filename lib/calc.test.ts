@@ -13,7 +13,8 @@ import type { Globals, ScenarioInputs } from "./types";
 
 const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   discountRate: 0.08,
-  lcPercent: 0.09,
+  lcLLRepPercent: 0.045,
+  lcTenantRepPercent: 0.045,
   shellCostPSF: 140,
   lcStructure: "upfront",
   lcCalculation: "tiered",
@@ -182,6 +183,17 @@ describe("calcLC", () => {
     expect(lc).toBeCloseTo(5.32, 2);
   });
 
+  it("LL Rep + TR split sums to the same LC as a single equivalent percent", () => {
+    const s = buildAnnualSchedule(proposalInputs);
+    const single = calcLC(s, 0.09);
+    // Same total split 50/50 between LL and TR (mirrors runScenario summing).
+    const split = calcLC(s, 0.045 + 0.045);
+    expect(split).toBeCloseTo(single, 6);
+    // And split 4/5 vs 1/5
+    const skewed = calcLC(s, 0.072 + 0.018);
+    expect(skewed).toBeCloseTo(single, 6);
+  });
+
   it("scales linearly with lcPercent", () => {
     const s = buildAnnualSchedule(proposalInputs);
     const a = calcLC(s, 0.09);
@@ -348,7 +360,7 @@ describe("edge cases", () => {
   it("zero free rent + zero TI + zero LC% → NER ≈ avg rate", () => {
     const r = runScenario(
       { ...proposalInputs, freeRentMonths: 0, tiAllowancePSF: 0 },
-      makeGlobals({ lcPercent: 0 }),
+      makeGlobals({ lcLLRepPercent: 0, lcTenantRepPercent: 0 }),
     );
     expect(r.undiscountedNER).toBeCloseTo(r.totals.avgRatePSF, 4);
   });

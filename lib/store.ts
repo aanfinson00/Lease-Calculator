@@ -28,7 +28,8 @@ import type { FreeVariable } from "./solver";
 
 const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
-  lcPercent: 0.09,
+  lcLLRepPercent: 0.045,
+  lcTenantRepPercent: 0.045,
   shellCostPSF: 140,
   lcStructure: "split50",
   lcCalculation: "tiered",
@@ -226,7 +227,7 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 5,
+      version: 6,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -237,6 +238,10 @@ export const useAppStore = create<AppStore>()(
       //          version bump alone forces a re-hydration so types match.
       // v4 → v5: scenarios gain optional freeRentStartMonth (default 1, which
       //          preserves the original front-loaded abatement behavior).
+      // v5 → v6: globals.lcPercent splits into lcLLRepPercent +
+      //          lcTenantRepPercent (50/50 of the prior total). The calc
+      //          engine continues to consume the sum, so headline numbers
+      //          are preserved exactly.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -268,6 +273,25 @@ export const useAppStore = create<AppStore>()(
                 (sc.inputs as Partial<ScenarioInputs>).freeRentStartMonth ?? 1,
             },
           }));
+        }
+        if (state && version < 6 && state.globals) {
+          const old = state.globals as Partial<Globals> & { lcPercent?: number };
+          if (old.lcPercent != null) {
+            const total = old.lcPercent;
+            state.globals = {
+              ...state.globals,
+              lcLLRepPercent: total / 2,
+              lcTenantRepPercent: total / 2,
+            };
+            delete (state.globals as { lcPercent?: number }).lcPercent;
+          } else {
+            // No prior lcPercent (corrupt or fresh) — fall back to defaults.
+            state.globals = {
+              ...state.globals,
+              lcLLRepPercent: state.globals.lcLLRepPercent ?? 0.045,
+              lcTenantRepPercent: state.globals.lcTenantRepPercent ?? 0.045,
+            };
+          }
         }
         return state as unknown as PersistedState;
       },
