@@ -8,6 +8,7 @@ import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
 import { MonthlyGrid } from "@/components/results/monthly-grid";
+import { RentSchedule } from "@/components/results/rent-schedule";
 import { WaterfallChart } from "@/components/results/waterfall-chart";
 import { SensitivityPanel } from "@/components/sensitivity/sensitivity-panel";
 import { runScenario } from "@/lib/calc";
@@ -89,6 +90,10 @@ export default function Home() {
 
       {a && b && aResults && bResults && (
         <>
+          <RentSchedule
+            a={{ id: a.id, name: a.inputs.name, inputs: a.inputs }}
+            b={{ id: b.id, name: b.inputs.name, inputs: b.inputs }}
+          />
           <AnnualSchedule
             aName={a.inputs.name}
             aResults={aResults}

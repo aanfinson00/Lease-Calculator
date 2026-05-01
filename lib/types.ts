@@ -45,6 +45,23 @@ export interface ScenarioInputs {
   baseRatePSF: number;
   /** Annual escalation, decimal (0.03 = 3%). */
   escalation: number;
+  /**
+   * Optional CPI-collar minimum: clamps the effective escalation rate to be
+   * at least this value (decimal, e.g. 0.02 = 2%). When undefined, no floor.
+   */
+  escalationFloor?: number;
+  /**
+   * Optional CPI-collar maximum: clamps the effective escalation rate to be
+   * at most this value (decimal). When undefined, no cap.
+   */
+  escalationCap?: number;
+  /**
+   * Optional per-year rent override. Sparse: index Y-1 corresponds to
+   * lease year Y. A `null` (or undefined) entry means "use the formula"
+   * (constant escalation with collar). A number overrides the rate for
+   * that year while leaving other years on the formula.
+   */
+  rentScheduleOverride?: (number | null)[];
 
   // Concessions
   /** TI allowance PSF, $. */

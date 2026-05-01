@@ -14,6 +14,8 @@ interface FieldDef {
   type?: "number" | "date" | "text";
   /** Stored as a fraction (0.03), rendered as a percent (3.00). */
   percent?: boolean;
+  /** Optional fields render empty when undefined and clearing → undefined. */
+  optional?: boolean;
 }
 
 interface SectionDef {
@@ -35,6 +37,8 @@ const SECTIONS: SectionDef[] = [
     fields: [
       { field: "baseRatePSF", label: "Base Rate ($/SF)", step: 0.01 },
       { field: "escalation", label: "Escalation (%)", step: 0.1, percent: true },
+      { field: "escalationFloor", label: "Floor (%)", step: 0.1, percent: true, optional: true },
+      { field: "escalationCap", label: "Cap (%)", step: 0.1, percent: true, optional: true },
     ],
   },
   {
@@ -234,10 +238,11 @@ interface CellProps {
 
 function Cell({ field, scenarioId, inputs }: CellProps) {
   const updateInput = useAppStore((s) => s.updateInput);
-  const { field: key, type = "number", step = 1, percent = false } = field;
+  const { field: key, type = "number", step = 1, percent = false, optional = false } = field;
 
   const renderValue = (): string => {
     const raw = inputs[key];
+    if (raw == null) return "";
     if (percent && typeof raw === "number") return (raw * 100).toFixed(2);
     if (typeof raw === "number") return String(raw);
     return String(raw);
@@ -245,6 +250,10 @@ function Cell({ field, scenarioId, inputs }: CellProps) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
+    if (optional && raw === "") {
+      updateInput(scenarioId, key, undefined as never);
+      return;
+    }
     if (type === "date" || (typeof inputs[key] === "string" && !percent)) {
       updateInput(scenarioId, key, raw as never);
       return;
@@ -260,6 +269,7 @@ function Cell({ field, scenarioId, inputs }: CellProps) {
       step={step}
       value={renderValue()}
       onChange={handleChange}
+      placeholder={optional ? "—" : undefined}
       className="h-8 px-2 text-sm"
     />
   );

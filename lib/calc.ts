@@ -32,7 +32,7 @@ import type {
  * exhausted. The final year may be partial (`monthsActive < 12`).
  */
 export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[] {
-  const { baseRatePSF, escalation, leaseTermMonths } = inputs;
+  const { baseRatePSF, leaseTermMonths } = inputs;
   // Free rent is months in real life — round to handle solver's continuous
   // bisection (any fractional x maps to the same integer-month behavior).
   const freeRentMonths = Math.round(inputs.freeRentMonths);
@@ -44,17 +44,33 @@ export function buildAnnualSchedule(inputs: ScenarioInputs): AnnualScheduleRow[]
     rows.push({ year: 0, annualRatePSF: 0, monthsActive: freeMonths });
   }
 
+  // Effective escalation applies a CPI collar: clamp to [floor, cap] if set.
+  // When neither is set, this is just `inputs.escalation`.
+  const effEsc = clamp(
+    inputs.escalation,
+    inputs.escalationFloor ?? Number.NEGATIVE_INFINITY,
+    inputs.escalationCap ?? Number.POSITIVE_INFINITY,
+  );
+
   let remaining = leaseTermMonths - freeMonths;
   let year = 1;
   while (remaining > 0) {
     const monthsActive = Math.min(12, remaining);
-    const annualRatePSF = baseRatePSF * Math.pow(1 + escalation, year - 1);
+    const overrideRate = inputs.rentScheduleOverride?.[year - 1];
+    const annualRatePSF =
+      overrideRate != null && Number.isFinite(overrideRate)
+        ? overrideRate
+        : baseRatePSF * Math.pow(1 + effEsc, year - 1);
     rows.push({ year, annualRatePSF, monthsActive });
     remaining -= monthsActive;
     year += 1;
   }
 
   return rows;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(Math.max(v, lo), hi);
 }
 
 // ---------------------------------------------------------------------------

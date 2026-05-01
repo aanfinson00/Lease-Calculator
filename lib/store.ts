@@ -226,12 +226,15 @@ export const useAppStore = create<AppStore>()(
         scenarios: state.scenarios,
         comparison: state.comparison,
       }),
-      version: 3,
+      version: 4,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
       // v2 → v3: globals gain lcCalculation (= "tiered", which preserves the
       //          existing split-tier LC formula).
+      // v3 → v4: scenarios gain optional escalationFloor / escalationCap /
+      //          rentScheduleOverride. All optional with no-op defaults; the
+      //          version bump alone forces a re-hydration so types match.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
