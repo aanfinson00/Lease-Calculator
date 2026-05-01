@@ -21,10 +21,11 @@ interface Props {
 /**
  * A NER waterfall chart: Base Rent → Free Rent → TI → LC → Net CF.
  *
- * Implementation note: Recharts doesn't have a built-in waterfall, so we fake
- * one by stacking an invisible "base" bar with the visible "value" bar. Each
- * bar's "base" is where the running total currently sits; its value is the
- * delta (positive or negative). The final Net CF bar starts from 0.
+ * Recharts doesn't have a built-in waterfall, so we fake one by stacking an
+ * invisible "base" bar with the visible "value" bar. Each bar's "base" is
+ * where the running total currently sits; its value is the delta. The final
+ * Net CF bar starts from 0. Colors come from theme tokens so the whole chart
+ * re-skins with the brand palette.
  */
 export function WaterfallChart({ title, waterfall }: Props) {
   const data = [
@@ -36,27 +37,27 @@ export function WaterfallChart({ title, waterfall }: Props) {
     },
     {
       name: "Free Rent",
-      base: waterfall.baseRent + waterfall.freeRent, // running total bottom
-      value: -waterfall.freeRent, // bar height (positive)
-      color: "#dc2626", // red
+      base: waterfall.baseRent + waterfall.freeRent,
+      value: -waterfall.freeRent,
+      color: "var(--color-cost)",
     },
     {
       name: "TI",
       base: waterfall.baseRent + waterfall.freeRent + waterfall.ti,
       value: -waterfall.ti,
-      color: "#dc2626",
+      color: "var(--color-cost)",
     },
     {
       name: "LC",
       base: waterfall.baseRent + waterfall.freeRent + waterfall.ti + waterfall.lc,
       value: -waterfall.lc,
-      color: "#dc2626",
+      color: "var(--color-cost)",
     },
     {
       name: "Net CF",
       base: 0,
       value: waterfall.netCashFlow,
-      color: "#059669", // emerald
+      color: "var(--color-success)",
     },
   ];
 
@@ -65,19 +66,29 @@ export function WaterfallChart({ title, waterfall }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
+        <CardTitle className="text-[11px] tracking-[0.14em] text-[var(--color-foreground)]">
+          {title} · Waterfall
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={{ stroke: "var(--color-border)" }}
+              />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={{ stroke: "var(--color-border)" }}
                 tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
                 domain={[0, Math.ceil(max * 1.1)]}
               />
               <Tooltip
+                cursor={{ fill: "var(--color-muted)" }}
                 formatter={(v) => fmtCurrency(typeof v === "number" ? v : Number(v), 2)}
                 labelStyle={{ color: "var(--color-foreground)" }}
                 contentStyle={{
@@ -88,7 +99,7 @@ export function WaterfallChart({ title, waterfall }: Props) {
                 }}
               />
               <Bar dataKey="base" stackId="w" fill="transparent" />
-              <Bar dataKey="value" stackId="w">
+              <Bar dataKey="value" stackId="w" radius={[2, 2, 0, 0]}>
                 {data.map((d, i) => (
                   <Cell key={i} fill={d.color} />
                 ))}

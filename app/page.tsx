@@ -36,17 +36,33 @@ export default function Home() {
   if (!hydrated) {
     // Avoid the SSR/CSR flash of default state before localStorage restores.
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-[var(--color-muted-foreground)]">
-        Loading…
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
+            RFP Analyzer
+          </span>
+          <span className="text-xs text-[var(--color-muted-foreground)]">Loading…</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
-      <header className="flex flex-col gap-4">
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
+      <header className="flex flex-col gap-4 border-b pb-5">
         <div className="flex items-end justify-between gap-4">
-          <div className="flex-1"><PropertyHeader /></div>
+          <div className="flex flex-1 items-end gap-6">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--color-primary)]">
+                RFP Analyzer
+              </span>
+              <span className="text-[11px] text-[var(--color-muted-foreground)]">
+                Net Effective Rent · Industrial Lease Comparison
+              </span>
+            </div>
+            <div className="h-10 w-px bg-[var(--color-border)]" />
+            <div className="flex-1"><PropertyHeader /></div>
+          </div>
           <ExportPdfButton />
         </div>
         <ScenarioBar />
@@ -54,9 +70,9 @@ export default function Home() {
 
       <GlobalsPanel />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr),minmax(0,1.2fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr),minmax(0,1.2fr)]">
         <InputsPanel />
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {a && b && aResults && bResults && (
             <>
               <HeadlineCard

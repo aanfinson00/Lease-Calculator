@@ -19,9 +19,7 @@ export function GlobalsPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm uppercase tracking-wide text-[var(--color-muted-foreground)]">
-          Globals (shared across scenarios)
-        </CardTitle>
+        <CardTitle>Globals · shared across scenarios</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Field label="Building Shell Cost ($/SF)">

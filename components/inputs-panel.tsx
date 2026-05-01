@@ -30,9 +30,7 @@ export function InputsPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm uppercase tracking-wide text-[var(--color-muted-foreground)]">
-          Inputs
-        </CardTitle>
+        <CardTitle>Inputs</CardTitle>
         <div className="grid grid-cols-[1fr,1fr,1fr] gap-4 pt-2 text-sm font-semibold">
           <div className="text-[var(--color-muted-foreground)]">Field</div>
           <div>{a.inputs.name}</div>

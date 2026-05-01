@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fmtPSF, fmtPercent } from "@/lib/format";
+import { fmtPSF, fmtPercent, fmtSignedCurrency, fmtSignedPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ScenarioResults } from "@/lib/types";
 
@@ -12,42 +12,55 @@ interface Props {
   bResults: ScenarioResults;
 }
 
+type Format = "currency" | "percent";
+
+interface MetricRow {
+  label: string;
+  a: number;
+  b: number;
+  format: Format;
+  /** True if the headline metric — gets the bigger treatment. */
+  primary?: boolean;
+}
+
 /**
- * The headline metrics card — five rows × three columns (A | B | Δ).
- * Δ is colored: positive = green, negative = red. We deliberately don't
- * editorialize "Δ should be positive" — that varies by metric.
+ * Headline metrics card — five rows × three columns (A | B | Δ).
+ * Δ uses theme `success` (gain) and `destructive` (loss) tokens; we don't
+ * editorialize whether positive is good — the analyst reads context.
+ * Primary metrics (NER) get larger numerals.
  */
 export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
-  const rows: Array<{ label: string; a: number; b: number; format: (v: number) => string }> = [
-    {
-      label: "Undiscounted NER",
-      a: aResults.undiscountedNER,
-      b: bResults.undiscountedNER,
-      format: (v) => fmtPSF(v),
-    },
+  const rows: MetricRow[] = [
     {
       label: "Discounted NER",
       a: aResults.discountedNER,
       b: bResults.discountedNER,
-      format: (v) => fmtPSF(v),
+      format: "currency",
+      primary: true,
     },
     {
-      label: "YoC (Year 1)",
+      label: "Undiscounted NER",
+      a: aResults.undiscountedNER,
+      b: bResults.undiscountedNER,
+      format: "currency",
+    },
+    {
+      label: "YoC · Year 1",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
-      format: (v) => fmtPercent(v),
+      format: "percent",
     },
     {
-      label: "YoC (Term)",
+      label: "YoC · Term",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
-      format: (v) => fmtPercent(v),
+      format: "percent",
     },
     {
       label: "Building Cost",
       a: aResults.buildingCostPSF,
       b: bResults.buildingCostPSF,
-      format: (v) => fmtPSF(v),
+      format: "currency",
     },
   ];
 
@@ -55,34 +68,55 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Headline Metrics</CardTitle>
-        <div className="grid grid-cols-[1.4fr,1fr,1fr,1fr] gap-2 pt-2 text-sm font-semibold">
-          <div className="text-[var(--color-muted-foreground)]">Metric</div>
+        <div className="grid grid-cols-[1.4fr,1fr,1fr,1fr] gap-2 pt-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+          <div>Metric</div>
           <div className="text-right">{aName}</div>
           <div className="text-right">{bName}</div>
           <div className="text-right">Δ (B − A)</div>
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2">
+      <CardContent className="flex flex-col">
         {rows.map((r) => {
           const delta = r.b - r.a;
-          const positive = delta > 0;
-          const negative = delta < 0;
+          const isGain = delta > 0;
+          const isLoss = delta < 0;
+          const fmt = r.format === "percent" ? fmtPercent : fmtPSF;
+          const fmtSigned = r.format === "percent" ? fmtSignedPercent : fmtSignedCurrency;
           return (
             <div
               key={r.label}
-              className="grid grid-cols-[1.4fr,1fr,1fr,1fr] items-center gap-2 border-t pt-2 text-sm first:border-t-0 first:pt-0"
+              className={cn(
+                "grid grid-cols-[1.4fr,1fr,1fr,1fr] items-baseline gap-2 border-t py-2.5 first:border-t-0 first:pt-0",
+                r.primary && "py-3.5",
+              )}
             >
-              <div className="text-[var(--color-muted-foreground)]">{r.label}</div>
-              <div className="text-right tabular-nums">{r.format(r.a)}</div>
-              <div className="text-right font-semibold tabular-nums">{r.format(r.b)}</div>
+              <div className="text-sm text-[var(--color-muted-foreground)]">{r.label}</div>
               <div
                 className={cn(
                   "text-right tabular-nums",
-                  positive && "text-emerald-600",
-                  negative && "text-red-600",
+                  r.primary ? "text-base" : "text-sm",
                 )}
               >
-                {r.format(delta).replace("$", delta >= 0 ? "+$" : "-$").replace("--$", "$")}
+                {fmt(r.a)}
+              </div>
+              <div
+                className={cn(
+                  "text-right font-semibold tabular-nums",
+                  r.primary ? "text-lg text-[var(--color-foreground)]" : "text-sm",
+                )}
+              >
+                {fmt(r.b)}
+              </div>
+              <div
+                className={cn(
+                  "text-right tabular-nums",
+                  r.primary ? "text-base font-medium" : "text-sm",
+                  isGain && "text-[var(--color-success)]",
+                  isLoss && "text-[var(--color-destructive)]",
+                  !isGain && !isLoss && "text-[var(--color-muted-foreground)]",
+                )}
+              >
+                {fmtSigned(delta)}
               </div>
             </div>
           );

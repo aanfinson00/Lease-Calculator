@@ -45,6 +45,22 @@ export function fmtDelta(v: number | null | undefined, fractionDigits = 2): stri
   return `${sign}${n.toFixed(fractionDigits)}`;
 }
 
+/** Signed currency: "+$1.23", "-$0.45". */
+export function fmtSignedCurrency(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  const n = v as number;
+  const sign = n >= 0 ? "+" : "-";
+  return `${sign}${fmtCurrency(Math.abs(n), fractionDigits)}`;
+}
+
+/** Signed percent: "+2.30%", "-1.20%". */
+export function fmtSignedPercent(v: number | null | undefined, fractionDigits = 2): string {
+  if (isNotFinite(v)) return "—";
+  const n = v as number;
+  const sign = n >= 0 ? "+" : "-";
+  return `${sign}${(Math.abs(n) * 100).toFixed(fractionDigits)}%`;
+}
+
 /** Plain number with locale separators. */
 export function fmtNumber(v: number | null | undefined, fractionDigits = 0): string {
   if (isNotFinite(v)) return "—";

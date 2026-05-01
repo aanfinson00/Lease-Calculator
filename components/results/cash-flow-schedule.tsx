@@ -98,11 +98,11 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
                 const isCommencement = i + 1 === offset + 1 && offset > 0;
                 const isRentStart = i + 1 === rcMonth && free > 0;
                 const marker = isExecution
-                  ? "Exec"
+                  ? { label: "Exec", color: "var(--color-primary)" }
                   : isCommencement
-                    ? "Comm"
+                    ? { label: "Comm", color: "var(--color-muted-foreground)" }
                     : isRentStart
-                      ? "Rent"
+                      ? { label: "Rent", color: "var(--color-success)" }
                       : null;
                 return (
                   <th
@@ -112,8 +112,11 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
                   >
                     <div>M{r.month}</div>
                     {marker && (
-                      <div className="text-[10px] font-semibold uppercase text-[var(--color-primary)]">
-                        {marker}
+                      <div
+                        className="text-[10px] font-semibold uppercase tracking-wide"
+                        style={{ color: marker.color }}
+                      >
+                        {marker.label}
                       </div>
                     )}
                   </th>
@@ -194,7 +197,7 @@ interface RowProps {
 
 function Row({ label, values, total, offset, rcMonth, free, emphasized = false }: RowProps) {
   const rowCls = emphasized
-    ? "border-t bg-[var(--color-muted)]/40 font-semibold"
+    ? "border-t-2 border-t-[var(--color-border)] bg-[var(--color-muted)]/50 font-semibold"
     : "border-t";
   const cellCls = "px-2 py-1 text-right whitespace-nowrap";
   const labelBg = emphasized ? "bg-[var(--color-muted)]" : "bg-[var(--color-card)]";
@@ -202,13 +205,28 @@ function Row({ label, values, total, offset, rcMonth, free, emphasized = false }
     <tr className={rowCls}>
       <td className={`sticky left-0 z-10 border-r ${labelBg} px-2 py-1 text-left`}>{label}</td>
       {values.map((v, i) => (
-        <td key={i} className={cellBorder(i + 1, offset, rcMonth, free) + " " + cellCls}>
+        <td
+          key={i}
+          className={cellBorder(i + 1, offset, rcMonth, free) + " " + cellCls}
+          style={emphasized && v !== 0 ? { color: cashColor(v) } : undefined}
+        >
           {fmtCash(v)}
         </td>
       ))}
-      <td className={`sticky right-0 z-10 border-l ${labelBg} ${cellCls}`}>{fmtCash(total)}</td>
+      <td
+        className={`sticky right-0 z-10 border-l ${labelBg} ${cellCls}`}
+        style={emphasized ? { color: cashColor(total) } : undefined}
+      >
+        {fmtCash(total)}
+      </td>
     </tr>
   );
+}
+
+function cashColor(v: number): string {
+  if (v > 0) return "var(--color-success)";
+  if (v < 0) return "var(--color-cost)";
+  return "var(--color-muted-foreground)";
 }
 
 // ---------- helpers ----------
@@ -224,7 +242,7 @@ function cellBorder(month: number, offset: number, rcMonth: number, free: number
 function fmtCash(v: number): string {
   if (!Number.isFinite(v) || v === 0) return "—";
   const abs = Math.abs(v);
-  const sign = v < 0 ? "-" : "";
+  const sign = v < 0 ? "−" : "";
   if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
   if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`;
   return `${sign}$${abs.toFixed(0)}`;
