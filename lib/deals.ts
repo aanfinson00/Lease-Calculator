@@ -154,7 +154,6 @@ export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
     // Clear any prior step-rent override so the loaded deal is calculated
     // from the formula until the user customizes again.
     rentScheduleOverride: undefined,
-    freeRentStartMonth: 1,
     tiDurationMonths: 1,
   };
 }

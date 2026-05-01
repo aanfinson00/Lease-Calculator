@@ -82,14 +82,12 @@ describe("buildAnnualSchedule", () => {
     expect(s.reduce((sum, r) => sum + r.monthsActive, 0)).toBe(130);
   });
 
-  it("schedule shape is invariant to free-rent count or location", () => {
+  it("schedule shape is invariant to free-rent count", () => {
     const noFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 0 });
     const someFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 6 });
     const lotsOfFree = buildAnnualSchedule({ ...proposalInputs, freeRentMonths: 18 });
-    const midTerm = buildAnnualSchedule({ ...proposalInputs, freeRentStartMonth: 13 });
     expect(noFree).toEqual(someFree);
     expect(noFree).toEqual(lotsOfFree);
-    expect(noFree).toEqual(midTerm);
   });
 
   it("handles partial final year (term not divisible by 12)", () => {
@@ -467,39 +465,18 @@ describe("lease execution date — commission split timing", () => {
   });
 });
 
-describe("free rent start month — mid-term abatements", () => {
-  it("default (undefined or 1) reproduces the original front-loaded abatement", () => {
-    const a = runScenario(proposalInputs, makeGlobals());
-    const b = runScenario({ ...proposalInputs, freeRentStartMonth: 1 }, makeGlobals());
-    expect(b.undiscountedNER).toBeCloseTo(a.undiscountedNER, 6);
-    expect(b.discountedNER).toBeCloseTo(a.discountedNER, 6);
+describe("free rent (always front-loaded)", () => {
+  it("free rent abates months 1..freeRentMonths of the lease", () => {
+    const r = runScenario(proposalInputs, makeGlobals());
+    // Months 1-6: free (baseRent=0). Month 7+: paying.
+    expect(r.grid[0].baseRentPSF).toBe(0);
+    expect(r.grid[5].baseRentPSF).toBe(0);
+    expect(r.grid[6].baseRentPSF).toBeGreaterThan(0);
   });
 
-  it("mid-term abatement: free rent lands at the specified month", () => {
-    // 6 free months starting at month 13 (yr 2 anniversary)
+  it("split50: half at execution (M1), half at rent commencement (M = free + 1)", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 13 },
-      makeGlobals(),
-    );
-    // Months 1-12: paying. Months 13-18: free. Months 19+: paying.
-    expect(r.grid[11].baseRentPSF).toBeGreaterThan(0); // M12
-    expect(r.grid[12].baseRentPSF).toBe(0);            // M13
-    expect(r.grid[17].baseRentPSF).toBe(0);            // M18
-    expect(r.grid[18].baseRentPSF).toBeGreaterThan(0); // M19
-  });
-
-  // Note: front-loaded and mid-term abatements use intentionally different
-  // schedule shapes — front-loaded shifts rent years after the abatement (the
-  // Excel/spec convention where rent yr 1 starts at rent commencement),
-  // mid-term uses calendar years (rent yr 1 = months 1-12 of contract).
-  // The two shapes yield slightly different LC, avg rate, and NER for the
-  // same parameters except free location. That's expected — the user picks
-  // ONE timing for their lease, and the model is consistent within that
-  // choice. We don't assert front-vs-mid invariance (it doesn't hold).
-
-  it("front-loaded abatement: LC half lands at rent commencement (after free months)", () => {
-    const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 1, lcStructure: "split50" },
+      { ...proposalInputs, lcStructure: "split50" },
       makeGlobals(),
     );
     const half = -r.totals.lcPSF / 2;
@@ -508,46 +485,13 @@ describe("free rent start month — mid-term abatements", () => {
     expect(r.grid[6].lcPSF).toBeCloseTo(half, 6);
   });
 
-  it("mid-term abatement: rent starts at lease commencement → both LC halves collapse to M1 (when execution=commencement)", () => {
+  it("split50 with no free rent: both halves collapse to M1", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 13, lcStructure: "split50" },
+      { ...proposalInputs, freeRentMonths: 0, lcStructure: "split50" },
       makeGlobals(),
     );
-    // Both halves at month 1 (rcMonth === 1 because execution=commencement and no front-load)
     expect(r.grid[0].lcPSF).toBeCloseTo(-r.totals.lcPSF, 6);
-    // No second LC payment in M7 since rent already kicked in at M1.
-    expect(r.grid[6].lcPSF).toBe(0);
-  });
-
-  it("mid-term abatement with execution before commencement: half at M1 (exec), half at commencement", () => {
-    const r = runScenario(
-      {
-        ...proposalInputs,
-        leaseExecutionDate: "2024-10-01",
-        leaseCommencement: "2025-01-01",
-        freeRentStartMonth: 13, // mid-term abatement
-        lcStructure: "split50",
-      },
-      makeGlobals(),
-    );
-    const half = -r.totals.lcPSF / 2;
-    // Half 1 at execution (M1 of grid)
-    expect(r.grid[0].lcPSF).toBeCloseTo(half, 6);
-    // Half 2 at commencement (M = commencementOffset+1 = 4, grid index 3)
-    expect(r.grid[3].lcPSF).toBeCloseTo(half, 6);
-  });
-
-  it("abatement clamps when start + count exceeds the lease term", () => {
-    // 6 free months starting at month 128 of a 130-mo term → only months 128-130 are free
-    const r = runScenario(
-      { ...proposalInputs, freeRentStartMonth: 128 },
-      makeGlobals(),
-    );
-    expect(r.grid[126].baseRentPSF).toBeGreaterThan(0); // M127 paying
-    expect(r.grid[127].baseRentPSF).toBe(0);            // M128 free
-    expect(r.grid[129].baseRentPSF).toBe(0);            // M130 free
-    // Past term, just zeros
-    expect(r.grid[130].baseRentPSF).toBe(0);
+    expect(r.grid[1].lcPSF).toBe(0);
   });
 });
 

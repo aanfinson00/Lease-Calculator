@@ -55,7 +55,6 @@ const SECTIONS: SectionDef[] = [
       { field: "tiAllowancePSF", label: "TI Allowance ($/SF)", step: 0.5 },
       { field: "tiDurationMonths", label: "TI Duration (mo)", step: 1 },
       { field: "freeRentMonths", label: "Free Rent (mo)", step: 1 },
-      { field: "freeRentStartMonth", label: "Free Rent Start (mo from commencement)", step: 1, optional: true },
     ],
   },
   {

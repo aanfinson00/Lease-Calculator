@@ -100,7 +100,6 @@ describe("dealAsScenarioPatch", () => {
 
   it("clears prior overrides so the loaded deal is on the formula", () => {
     expect(patch.rentScheduleOverride).toBeUndefined();
-    expect(patch.freeRentStartMonth).toBe(1);
     expect(patch.tiDurationMonths).toBe(1);
   });
 

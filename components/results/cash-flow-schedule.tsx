@@ -58,13 +58,8 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
   );
   const offset = Math.max(0, commencementOffset);
   const free = Math.max(0, Math.min(Math.round(inputs.freeRentMonths), inputs.leaseTermMonths));
-  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
-  const freeEnd = Math.min(freeStart + free - 1, inputs.leaseTermMonths);
-  // Front-loaded abatement defers rent commencement; mid-term abatement leaves
-  // it at lease commencement.
-  const rcMonth = offset + (freeStart === 1 ? free : 0) + 1;
-  const abatementStartMonth = free > 0 ? offset + freeStart : null;
-  const abatementEndMonth = free > 0 ? offset + freeEnd : null;
+  // Front-loaded abatement (always): rent commencement = end of free + 1.
+  const rcMonth = offset + free + 1;
   const span = offset + inputs.leaseTermMonths;
   const rows = results.grid.slice(0, span);
 
@@ -86,8 +81,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
         <span className="font-semibold">{name}</span>
         <span className="text-[var(--color-muted-foreground)]">
           Execution {inputs.leaseExecutionDate} · Commencement {inputs.leaseCommencement}
-          {free > 0 && freeStart === 1 && ` · Rent Comm. M${rcMonth}`}
-          {free > 0 && freeStart > 1 && ` · Free M${abatementStartMonth}–M${abatementEndMonth}`}
+          {free > 0 && ` · Rent Comm. M${rcMonth}`}
           {" · all values $/SF"}
         </span>
       </div>
@@ -102,26 +96,17 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
                 const m = i + 1;
                 const isExecution = m === 1;
                 const isCommencement = m === offset + 1 && offset > 0;
-                // "Rent" marker only meaningful when front-loaded abatement
-                // delays rent commencement; for mid-term abatements the
-                // abatement window itself is marked instead.
-                const isRentStart = m === rcMonth && free > 0 && freeStart === 1;
-                const isFreeStart =
-                  abatementStartMonth != null && m === abatementStartMonth && freeStart > 1;
+                // Rent commencement = end of front-loaded free rent + 1.
+                const isRentStart = m === rcMonth && free > 0;
                 const marker = isExecution
                   ? { label: "Exec", color: "var(--color-primary)" }
                   : isCommencement
                     ? { label: "Comm", color: "var(--color-muted-foreground)" }
                     : isRentStart
                       ? { label: "Rent", color: "var(--color-success)" }
-                      : isFreeStart
-                        ? { label: "Free", color: "var(--color-cost)" }
-                        : null;
-                const inAbatement =
-                  abatementStartMonth != null &&
-                  abatementEndMonth != null &&
-                  m >= abatementStartMonth &&
-                  m <= abatementEndMonth;
+                      : null;
+                // Tint the front-loaded abatement window.
+                const inAbatement = free > 0 && m > offset && m <= offset + free;
                 return (
                   <th
                     key={i}

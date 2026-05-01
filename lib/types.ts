@@ -70,15 +70,8 @@ export interface ScenarioInputs {
   // Concessions
   /** TI allowance PSF, $. */
   tiAllowancePSF: number;
-  /** Free rent in months. */
+  /** Free rent in months (always front-loaded — months 1..freeRentMonths). */
   freeRentMonths: number;
-  /**
-   * 1-indexed month from rent commencement when the abatement window starts.
-   * `1` (default) = at commencement; `13` = start of lease year 2; etc.
-   * The window covers `freeRentStartMonth..freeRentStartMonth+freeRentMonths-1`,
-   * clamped to the lease term.
-   */
-  freeRentStartMonth?: number;
 
   // Term
   /** Total lease term in months, INCLUDING free-rent period. */

@@ -95,15 +95,13 @@ export function calcLC(
 ): number {
   const term = inputs.leaseTermMonths;
   const free = Math.max(0, Math.min(Math.round(inputs.freeRentMonths), term));
-  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
-  const freeEnd = Math.min(freeStart + free - 1, term);
 
   let tier1 = 0; // first 60 paying months (full %)
   let tier2 = 0; // paying months 61+      (half %)
   let payingCount = 0;
 
-  for (let m = 1; m <= term; m++) {
-    if (m >= freeStart && m <= freeEnd) continue; // skip abated month
+  // Free rent is always months 1..free; paying months are free+1..term.
+  for (let m = free + 1; m <= term; m++) {
     payingCount += 1;
     const calendarYear = Math.floor((m - 1) / 12) + 1;
     const monthlyRent = annualRateForYear(inputs, calendarYear) / 12;
@@ -141,12 +139,8 @@ export function buildMonthlyGrid(
 ): MonthlyGridRow[] {
   const term = inputs.leaseTermMonths;
   const free = Math.min(Math.round(inputs.freeRentMonths), term);
-
-  // Mid-term abatement window: 1-indexed from commencement. Defaults to 1
-  // (front-loaded), preserving original behavior. Clamp the window to fit
-  // inside the lease term.
-  const freeStart = Math.max(1, Math.round(inputs.freeRentStartMonth ?? 1));
-  const freeEnd = Math.min(freeStart + free - 1, term);
+  // Free rent is always front-loaded — months 1..free of the lease.
+  const freeEnd = free;
 
   const execution = new Date(inputs.leaseExecutionDate);
   const commencement = new Date(inputs.leaseCommencement);
@@ -185,11 +179,8 @@ export function buildMonthlyGrid(
   const lcAtExecution = inputs.lcStructure === "upfront" ? -lcTotalPSF : -lcTotalPSF / 2;
   const lcAtRC = inputs.lcStructure === "upfront" ? 0 : -lcTotalPSF / 2;
   // 1-indexed month (from execution) where rent collection first kicks in.
-  // Front-loaded free rent (start === 1, free > 0) pushes rent commencement
-  // out by `free` months; a mid-term abatement leaves rent starting at the
-  // lease commencement.
-  const rcOffset = freeStart === 1 ? free : 0;
-  const rcMonth = commencementOffset + rcOffset + 1;
+  // Free rent is always front-loaded, so rent commencement = free rent end + 1.
+  const rcMonth = commencementOffset + free + 1;
 
   const tiPerMonth = tiDuration > 0 ? -inputs.tiAllowancePSF / tiDuration : 0;
 
@@ -200,7 +191,7 @@ export function buildMonthlyGrid(
     const annualRate = inLease ? monthToRate[monthFromCommencement - 1] : 0;
 
     const isFree =
-      inLease && monthFromCommencement >= freeStart && monthFromCommencement <= freeEnd;
+      inLease && monthFromCommencement >= 1 && monthFromCommencement <= freeEnd;
     const baseRentPSF = isFree ? 0 : annualRate / 12;
     const freeRentPSF = isFree ? -phantomRateForMonth(monthFromCommencement) / 12 : 0;
 

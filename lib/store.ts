@@ -57,6 +57,7 @@ const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): Scena
   };
 };
 
+
 const newId = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -244,7 +245,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 11,
+      version: 12,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -253,8 +254,7 @@ export const useAppStore = create<AppStore>()(
       // v3 → v4: scenarios gain optional escalationFloor / escalationCap /
       //          rentScheduleOverride. All optional with no-op defaults; the
       //          version bump alone forces a re-hydration so types match.
-      // v4 → v5: scenarios gain optional freeRentStartMonth (default 1, which
-      //          preserves the original front-loaded abatement behavior).
+      // v4 → v5: (formerly added freeRentStartMonth; dropped in v12, now no-op)
       // v5 → v6: globals.lcPercent splits into lcLLRepPercent +
       //          lcTenantRepPercent (50/50 of the prior total). The calc
       //          engine continues to consume the sum, so headline numbers
@@ -274,6 +274,8 @@ export const useAppStore = create<AppStore>()(
       // v10 → v11: lift globals.lcStructure + lcCalculation into each
       //            scenario's inputs as well. Different deals can have
       //            different calc methods and payment timings.
+      // v11 → v12: drop scenarios.freeRentStartMonth (mid-term abatement
+      //            removed; free rent is always front-loaded now).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -296,16 +298,8 @@ export const useAppStore = create<AppStore>()(
           const g = state.globals as unknown as Record<string, unknown>;
           if (typeof g.lcCalculation !== "string") g.lcCalculation = "tiered";
         }
-        if (state && version < 5 && state.scenarios) {
-          state.scenarios = state.scenarios.map((sc) => ({
-            ...sc,
-            inputs: {
-              ...sc.inputs,
-              freeRentStartMonth:
-                (sc.inputs as Partial<ScenarioInputs>).freeRentStartMonth ?? 1,
-            },
-          }));
-        }
+        // v4 → v5 was a freeRentStartMonth backfill; the field is dropped in
+        // v12 anyway, so there's nothing to do at this step now.
         if (state && version < 6 && state.globals) {
           // Migration to a now-deprecated globals shape (lcLLRepPercent +
           // lcTenantRepPercent on globals). v10 moves them onto inputs;
@@ -375,6 +369,14 @@ export const useAppStore = create<AppStore>()(
           }));
           delete g.lcCalculation;
           delete g.lcStructure;
+        }
+        if (state && version < 12 && state.scenarios) {
+          state.scenarios = state.scenarios.map((sc) => {
+            const { freeRentStartMonth: _f, ...rest } =
+              sc.inputs as ScenarioInputs & { freeRentStartMonth?: number };
+            void _f;
+            return { ...sc, inputs: rest };
+          });
         }
         return state as unknown as PersistedState;
       },
