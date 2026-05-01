@@ -2,8 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAppStore } from "@/lib/store";
-import type { ScenarioInputs } from "@/lib/types";
+import type { LCCalculation, LCStructure, ScenarioInputs } from "@/lib/types";
 
 interface FieldDef {
   field: keyof ScenarioInputs;
@@ -54,10 +56,10 @@ const SECTIONS: SectionDef[] = [
 ];
 
 /**
- * Inputs panel — fields run across as columns, scenarios run down as rows.
- * Spreadsheet-y: read a column to compare scenarios on one field; read a row
- * to see one scenario's inputs in a section. Far more condensed than the
- * one-field-per-row predecessor.
+ * Inputs panel — Deal Assumptions strip at top (shared across scenarios),
+ * then a section grid for per-scenario inputs (fields run across as columns,
+ * scenarios run down as rows). Spreadsheet-y: read a column to compare
+ * scenarios on one field; read a row to see one scenario's section.
  */
 export function InputsPanel() {
   const aId = useAppStore((s) => s.comparison.aId);
@@ -86,6 +88,7 @@ export function InputsPanel() {
         <CardTitle>Inputs</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col divide-y">
+        <DealAssumptions />
         {SECTIONS.map((section) => (
           <Section key={section.title} section={section} scenarios={scenarios} />
         ))}
@@ -93,6 +96,93 @@ export function InputsPanel() {
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Deal Assumptions (shared globals: shell cost, discount, LC settings)
+// ---------------------------------------------------------------------------
+
+function DealAssumptions() {
+  const globals = useAppStore((s) => s.globals);
+  const update = useAppStore((s) => s.updateGlobals);
+
+  return (
+    <div className="flex flex-col gap-1.5 py-3 first:pt-0">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+        Deal Assumptions · shared
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <Stack label="Shell ($/SF)">
+          <Input
+            type="number"
+            step={0.01}
+            className="h-8 px-2 text-sm"
+            value={globals.shellCostPSF}
+            onChange={(e) => update({ shellCostPSF: Number(e.target.value) })}
+          />
+        </Stack>
+        <Stack label="Discount (%)">
+          <Input
+            type="number"
+            step={0.1}
+            className="h-8 px-2 text-sm"
+            value={(globals.discountRate * 100).toFixed(2)}
+            onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
+          />
+        </Stack>
+        <Stack label="LC (%)">
+          <Input
+            type="number"
+            step={0.1}
+            className="h-8 px-2 text-sm"
+            value={(globals.lcPercent * 100).toFixed(2)}
+            onChange={(e) => update({ lcPercent: Number(e.target.value) / 100 })}
+          />
+        </Stack>
+        <Stack label="LC Calc">
+          <RadioGroup
+            value={globals.lcCalculation}
+            onValueChange={(v) => update({ lcCalculation: v as LCCalculation })}
+            className="flex h-8 items-center gap-3"
+          >
+            <label className="flex items-center gap-1 text-sm" title="Full % yrs 1-5, half % yrs 6+">
+              <RadioGroupItem value="tiered" /> Tiered
+            </label>
+            <label className="flex items-center gap-1 text-sm" title="Full % every year">
+              <RadioGroupItem value="flat" /> Flat
+            </label>
+          </RadioGroup>
+        </Stack>
+        <Stack label="LC Payment">
+          <RadioGroup
+            value={globals.lcStructure}
+            onValueChange={(v) => update({ lcStructure: v as LCStructure })}
+            className="flex h-8 items-center gap-3"
+          >
+            <label className="flex items-center gap-1 text-sm">
+              <RadioGroupItem value="split50" /> 50/50
+            </label>
+            <label className="flex items-center gap-1 text-sm">
+              <RadioGroupItem value="upfront" /> Upfront
+            </label>
+          </RadioGroup>
+        </Stack>
+      </div>
+    </div>
+  );
+}
+
+function Stack({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Label className="text-[11px] text-[var(--color-muted-foreground)]">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-scenario sections
+// ---------------------------------------------------------------------------
 
 interface SectionProps {
   section: SectionDef;
@@ -106,7 +196,7 @@ function Section({ section, scenarios }: SectionProps) {
   const gridStyle = { gridTemplateColumns: `7.5rem repeat(${cols}, minmax(0, 1fr))` };
 
   return (
-    <div className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0">
+    <div className="flex flex-col gap-1.5 py-3 last:pb-0">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
         {section.title}
       </div>

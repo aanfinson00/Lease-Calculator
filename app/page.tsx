@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { GlobalsPanel } from "@/components/globals-panel";
 import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
@@ -67,8 +66,6 @@ export default function Home() {
         </div>
         <ScenarioBar />
       </header>
-
-      <GlobalsPanel />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr),minmax(0,1.2fr)]">
         <InputsPanel />
