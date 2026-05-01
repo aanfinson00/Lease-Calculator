@@ -63,7 +63,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       format: "percent",
     },
     {
-      label: "Building Cost",
+      label: "Total Basis",
       unit: "$/SF",
       a: aResults.buildingCostPSF,
       b: bResults.buildingCostPSF,

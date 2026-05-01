@@ -219,7 +219,7 @@ export function ComparisonDoc({
       delta: bResults.yocTerm - aResults.yocTerm,
     },
     {
-      label: "Building Cost PSF",
+      label: "Total Basis ($/SF)",
       a: aResults.buildingCostPSF,
       b: bResults.buildingCostPSF,
       fmt: (v: number) => fmtPSF(v, 2),
