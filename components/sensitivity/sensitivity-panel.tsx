@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { runScenario } from "@/lib/calc";
 import { fmtPSF, fmtPercent } from "@/lib/format";
 import { useAppStore } from "@/lib/store";
-import { defaultBounds, solveFor, type FreeVariable } from "@/lib/solver";
+import { defaultBounds, solveFor, type FreeVariable, type NERKind } from "@/lib/solver";
 import { cn } from "@/lib/utils";
 
 const FREE_VARS: { value: FreeVariable; label: string }[] = [
@@ -20,6 +20,10 @@ const FREE_VARS: { value: FreeVariable; label: string }[] = [
   { value: "tiAllowancePSF", label: "TI Allowance" },
   { value: "discountRate", label: "Discount Rate" },
 ];
+
+/** Discount rate doesn't affect undiscounted NER, so it's not a valid free
+ *  variable when holding the undiscounted metric. */
+const FREE_VARS_FOR_UNDISCOUNTED = FREE_VARS.filter((v) => v.value !== "discountRate");
 
 /**
  * Sensitivity sliders + Hold-NER mode.
@@ -104,10 +108,16 @@ export function SensitivityPanel() {
       const updatedInputs =
         freeVar === "discountRate" ? active.inputs : { ...active.inputs, [freeVar]: v };
       const updatedGlobals = freeVar === "discountRate" ? { ...globals, discountRate: v } : globals;
-      const result = solveFor(updatedInputs, updatedGlobals, holdNer.targetNER, holdNer.freeVar);
+      const result = solveFor(
+        updatedInputs,
+        updatedGlobals,
+        holdNer.targetNER,
+        holdNer.freeVar,
+        holdNer.nerKind,
+      );
       if (!result.converged) {
         setSolverError(
-          `Target NER of ${fmtPSF(holdNer.targetNER)} can't be reached by adjusting ${labelOf(holdNer.freeVar)} within its slider range.`,
+          `Target ${holdNer.nerKind} NER of ${fmtPSF(holdNer.targetNER)} can't be reached by adjusting ${labelOf(holdNer.freeVar)} within its slider range.`,
         );
       } else {
         setSolverError(null);
@@ -158,6 +168,7 @@ export function SensitivityPanel() {
                     targetNER: liveResults.discountedNER,
                     freeVar: holdNer?.freeVar ?? "baseRatePSF",
                     scenarioId: active.id,
+                    nerKind: holdNer?.nerKind ?? "discounted",
                   });
                 } else {
                   setHoldNer(null);
@@ -171,7 +182,39 @@ export function SensitivityPanel() {
           {isHolding && (
             <>
               <div className="flex items-center gap-2">
-                <Label className="text-xs text-[var(--color-muted-foreground)]">Target NER ($/SF):</Label>
+                <Label className="text-xs text-[var(--color-muted-foreground)]">Hold:</Label>
+                <select
+                  value={holdNer!.nerKind}
+                  onChange={(e) => {
+                    const nerKind = e.target.value as NERKind;
+                    // Re-seed target to the current value of the chosen NER and
+                    // bump the free var off discountRate if needed (it has no
+                    // effect on undiscounted NER → solver can't converge).
+                    const seed =
+                      nerKind === "undiscounted"
+                        ? liveResults.undiscountedNER
+                        : liveResults.discountedNER;
+                    const freeVar =
+                      nerKind === "undiscounted" && holdNer!.freeVar === "discountRate"
+                        ? "baseRatePSF"
+                        : holdNer!.freeVar;
+                    setHoldNer({
+                      ...holdNer!,
+                      nerKind,
+                      targetNER: seed,
+                      freeVar,
+                    });
+                  }}
+                  className="h-9 rounded-md border bg-transparent px-2 text-sm"
+                >
+                  <option value="discounted">Discounted</option>
+                  <option value="undiscounted">Undiscounted</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-[var(--color-muted-foreground)]">
+                  Target ({holdNer!.nerKind === "undiscounted" ? "undisc." : "disc."} NER, $/SF):
+                </Label>
                 <Input
                   type="number"
                   step={0.05}
@@ -194,11 +237,13 @@ export function SensitivityPanel() {
                   }
                   className="h-9 rounded-md border bg-transparent px-2 text-sm"
                 >
-                  {FREE_VARS.map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label}
-                    </option>
-                  ))}
+                  {(holdNer!.nerKind === "undiscounted" ? FREE_VARS_FOR_UNDISCOUNTED : FREE_VARS).map(
+                    (v) => (
+                      <option key={v.value} value={v.value}>
+                        {v.label}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
             </>
@@ -233,9 +278,17 @@ export function SensitivityPanel() {
           );
         })}
 
-        <div className="border-t pt-3 text-sm">
-          <span className="text-[var(--color-muted-foreground)]">Live discounted NER: </span>
-          <span className="font-semibold tabular-nums">{fmtPSF(liveResults.discountedNER)}</span>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t pt-3 text-sm">
+          <NERReadout
+            label="Live undiscounted NER"
+            value={liveResults.undiscountedNER}
+            held={isHolding && holdNer!.nerKind === "undiscounted"}
+          />
+          <NERReadout
+            label="Live discounted NER"
+            value={liveResults.discountedNER}
+            held={isHolding && holdNer!.nerKind === "discounted"}
+          />
         </div>
       </CardContent>
     </Card>
@@ -281,6 +334,35 @@ function SliderRow({ label, displayValue, value, min, max, step, locked, onChang
       >
         {displayValue}
       </div>
+    </div>
+  );
+}
+
+function NERReadout({
+  label,
+  value,
+  held,
+}: {
+  label: string;
+  value: number;
+  held: boolean;
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[var(--color-muted-foreground)]">{label}:</span>
+      <span
+        className={cn(
+          "font-semibold tabular-nums",
+          held && "text-[var(--color-primary)]",
+        )}
+      >
+        {fmtPSF(value)}
+      </span>
+      {held && (
+        <span className="rounded border border-[var(--color-primary)] px-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-primary)]">
+          Held
+        </span>
+      )}
     </div>
   );
 }

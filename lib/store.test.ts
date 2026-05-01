@@ -125,6 +125,7 @@ describe("useAppStore — Hold-NER (transient)", () => {
       targetNER: 7.5,
       freeVar: "baseRatePSF",
       scenarioId: s.scenarios[0]!.id,
+      nerKind: "discounted",
     });
     expect(useAppStore.getState().holdNer?.enabled).toBe(true);
   });
@@ -136,6 +137,7 @@ describe("useAppStore — Hold-NER (transient)", () => {
       targetNER: 7.5,
       freeVar: "baseRatePSF",
       scenarioId: s.scenarios[0]!.id,
+      nerKind: "discounted",
     });
     s.setHoldNer(null);
     expect(useAppStore.getState().holdNer).toBeNull();
@@ -159,6 +161,7 @@ describe("useAppStore — persistence", () => {
       targetNER: 7.5,
       freeVar: "baseRatePSF",
       scenarioId: s.scenarios[0]!.id,
+      nerKind: "discounted",
     });
     const raw = localStorage.getItem("lease-calculator/v1");
     const parsed = JSON.parse(raw!);

@@ -97,6 +97,43 @@ describe("solveFor — unreachable targets", () => {
   });
 });
 
+describe("solveFor — undiscounted NER mode", () => {
+  it.each<FreeVariable>([
+    "baseRatePSF",
+    "escalation",
+    "freeRentMonths",
+    "tiAllowancePSF",
+  ])("round-trips %s against undiscounted NER", (freeVar) => {
+    const target = runScenario(baseInputs, baseGlobals).undiscountedNER;
+    const result = solveFor(baseInputs, baseGlobals, target, freeVar, "undiscounted");
+    expect(result.converged).toBe(true);
+
+    const inputs = { ...baseInputs, [freeVar]: result.value };
+    const newNER = runScenario(inputs, baseGlobals).undiscountedNER;
+    // 2-decimal tolerance: undiscounted NER has a higher dNER/dvar gradient
+    // than discounted (less PV smoothing), so the bisection's input-tolerance
+    // exit produces slightly looser output residual.
+    expect(newNER).toBeCloseTo(target, 2);
+  });
+
+  it("does NOT converge when solving an undiscounted target by adjusting discountRate (no effect)", () => {
+    const target = runScenario(baseInputs, baseGlobals).undiscountedNER;
+    const result = solveFor(baseInputs, baseGlobals, target + 1, "discountRate", "undiscounted");
+    expect(result.converged).toBe(false);
+  });
+
+  it("kind defaults to discounted when omitted (back-compat)", () => {
+    const target = runScenario(baseInputs, baseGlobals).discountedNER;
+    const result = solveFor(baseInputs, baseGlobals, target, "baseRatePSF");
+    expect(result.converged).toBe(true);
+    const newNER = runScenario(
+      { ...baseInputs, baseRatePSF: result.value },
+      baseGlobals,
+    ).discountedNER;
+    expect(newNER).toBeCloseTo(target, 3);
+  });
+});
+
 describe("defaultBounds", () => {
   it("baseRatePSF is ±30% of current", () => {
     const [lo, hi] = defaultBounds("baseRatePSF", baseInputs);

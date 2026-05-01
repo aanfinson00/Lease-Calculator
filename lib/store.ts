@@ -21,7 +21,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Deal } from "./deals";
 import type { Globals, ScenarioInputs } from "./types";
-import type { FreeVariable } from "./solver";
+import type { FreeVariable, NERKind } from "./solver";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -76,6 +76,8 @@ interface HoldNerState {
   targetNER: number;
   freeVar: FreeVariable;
   scenarioId: string;
+  /** Which NER metric to pin: "undiscounted" or "discounted". */
+  nerKind: NERKind;
 }
 
 interface PersistedState {

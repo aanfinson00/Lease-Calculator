@@ -17,6 +17,9 @@ export type FreeVariable =
   | "tiAllowancePSF"
   | "discountRate";
 
+/** Which NER metric the solver should hold pinned. */
+export type NERKind = "undiscounted" | "discounted";
+
 export interface SolverResult {
   /** The free-variable value found, or NaN if !converged. */
   value: number;
@@ -45,20 +48,26 @@ export function defaultBounds(
 
 /**
  * Apply a candidate free-variable value to inputs/globals, then return the
- * resulting discounted NER. We branch on which knob is being turned because
- * 4 of the 5 free vars live on `inputs` and 1 (discountRate) lives on `globals`.
+ * NER metric of the requested kind. We branch on which knob is being turned
+ * because 4 of the 5 free vars live on `inputs` and 1 (discountRate) lives
+ * on `globals`.
+ *
+ * Note: undiscounted NER is invariant to discountRate, so solving an
+ * undiscounted target by adjusting discountRate will never converge — the
+ * UI hides that combination.
  */
 function nerWithOverride(
   inputs: ScenarioInputs,
   globals: Globals,
   freeVar: FreeVariable,
   x: number,
+  kind: NERKind,
 ): number {
-  if (freeVar === "discountRate") {
-    return runScenario(inputs, { ...globals, discountRate: x }).discountedNER;
-  }
-  const next: ScenarioInputs = { ...inputs, [freeVar]: x };
-  return runScenario(next, globals).discountedNER;
+  const r =
+    freeVar === "discountRate"
+      ? runScenario(inputs, { ...globals, discountRate: x })
+      : runScenario({ ...inputs, [freeVar]: x }, globals);
+  return kind === "undiscounted" ? r.undiscountedNER : r.discountedNER;
 }
 
 /**
@@ -74,13 +83,14 @@ export function solveFor(
   globals: Globals,
   targetNER: number,
   freeVar: FreeVariable,
+  kind: NERKind = "discounted",
   options: { bounds?: [number, number]; tolerance?: number; maxIterations?: number } = {},
 ): SolverResult {
   const [lo, hi] = options.bounds ?? defaultBounds(freeVar, inputs);
   const tolerance = options.tolerance ?? 1e-4;
   const maxIterations = options.maxIterations ?? 60;
 
-  const f = (x: number) => nerWithOverride(inputs, globals, freeVar, x) - targetNER;
+  const f = (x: number) => nerWithOverride(inputs, globals, freeVar, x, kind) - targetNER;
 
   let a = lo;
   let b = hi;
