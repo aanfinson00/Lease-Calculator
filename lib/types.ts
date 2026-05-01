@@ -19,15 +19,11 @@ export type LCCalculation = "tiered" | "flat";
 export interface Globals {
   /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
   discountRate: number;
-  /** Landlord-rep brokerage commission rate, decimal. */
-  lcLLRepPercent: number;
-  /** Tenant-rep brokerage commission rate, decimal. */
-  lcTenantRepPercent: number;
   /** Building shell cost PSF, $ — replaces the Excel hardcoded $140. */
   shellCostPSF: number;
-  /** How LC payments are timed. */
+  /** How LC payments are timed (firm-wide convention). */
   lcStructure: LCStructure;
-  /** How LC totals are calculated against the rent schedule. */
+  /** How LC totals are calculated against the rent schedule (firm-wide convention). */
   lcCalculation: LCCalculation;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
@@ -61,6 +57,15 @@ export interface ScenarioInputs {
    * while leaving other years on the formula.
    */
   rentScheduleOverride?: (number | null)[];
+
+  /**
+   * Landlord-rep brokerage commission rate, decimal (0.045 = 4.5%). Per
+   * scenario because deals can have different broker structures (e.g. UW
+   * assumes a co-broke split, but a direct deal might be LL-rep only).
+   */
+  lcLLRepPercent: number;
+  /** Tenant-rep brokerage commission rate, decimal. Per scenario. */
+  lcTenantRepPercent: number;
 
   // Concessions
   /** TI allowance PSF, $. */

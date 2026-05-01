@@ -331,7 +331,7 @@ export function runScenario(
   globals: Globals,
 ): ScenarioResults {
   const schedule = buildAnnualSchedule(inputs);
-  const totalLCPercent = globals.lcLLRepPercent + globals.lcTenantRepPercent;
+  const totalLCPercent = inputs.lcLLRepPercent + inputs.lcTenantRepPercent;
   const lcPSF = calcLC(schedule, totalLCPercent, globals.lcCalculation);
   const grid = buildMonthlyGrid(inputs, globals, schedule, lcPSF);
   const term = inputs.leaseTermMonths;

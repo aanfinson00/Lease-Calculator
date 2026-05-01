@@ -8,7 +8,8 @@ import { useAppStore } from "@/lib/store";
 import type { LCCalculation, LCStructure, ScenarioInputs } from "@/lib/types";
 
 interface FieldDef {
-  field: keyof ScenarioInputs;
+  /** Required for editable fields; omitted for derived (computed) fields. */
+  field?: keyof ScenarioInputs;
   label: string;
   step?: number;
   type?: "number" | "date" | "text";
@@ -16,6 +17,10 @@ interface FieldDef {
   percent?: boolean;
   /** Optional fields render empty when undefined and clearing → undefined. */
   optional?: boolean;
+  /** When set, the cell renders as a read-only computed value. */
+  compute?: (inputs: ScenarioInputs) => number;
+  /** How to render the computed value. */
+  computeFormat?: "percent" | "currency" | "number";
 }
 
 interface SectionDef {
@@ -46,6 +51,18 @@ const SECTIONS: SectionDef[] = [
       { field: "tiDurationMonths", label: "TI Duration (mo)", step: 1 },
       { field: "freeRentMonths", label: "Free Rent (mo)", step: 1 },
       { field: "freeRentStartMonth", label: "Free Rent Start (mo from commencement)", step: 1, optional: true },
+    ],
+  },
+  {
+    title: "Leasing Commissions",
+    fields: [
+      { field: "lcLLRepPercent", label: "Landlord Rep (%)", step: 0.01, percent: true },
+      { field: "lcTenantRepPercent", label: "Tenant Rep (%)", step: 0.01, percent: true },
+      {
+        label: "Combined (%)",
+        compute: (i) => (i.lcLLRepPercent + i.lcTenantRepPercent) * 100,
+        computeFormat: "percent",
+      },
     ],
   },
   {
@@ -107,19 +124,13 @@ export function InputsPanel() {
 function DealAssumptions() {
   const globals = useAppStore((s) => s.globals);
   const update = useAppStore((s) => s.updateGlobals);
-  const totalLC = (globals.lcLLRepPercent + globals.lcTenantRepPercent) * 100;
 
   return (
     <div className="flex flex-col gap-1.5 py-3 first:pt-0">
-      <div className="flex items-baseline gap-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-          Deal Assumptions · shared
-        </span>
-        <span className="text-[10px] tabular-nums text-[var(--color-muted-foreground)]">
-          Combined LC <span className="font-semibold text-[var(--color-foreground)]">{totalLC.toFixed(2)}%</span>
-        </span>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+        Deal Assumptions · shared
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         <Stack label="Shell ($/SF)">
           <Input
             type="number"
@@ -136,24 +147,6 @@ function DealAssumptions() {
             className="h-8 px-2 text-sm"
             value={(globals.discountRate * 100).toFixed(2)}
             onChange={(e) => update({ discountRate: Number(e.target.value) / 100 })}
-          />
-        </Stack>
-        <Stack label="Landlord Rep (%)">
-          <Input
-            type="number"
-            step={0.01}
-            className="h-8 px-2 text-sm"
-            value={(globals.lcLLRepPercent * 100).toFixed(2)}
-            onChange={(e) => update({ lcLLRepPercent: Number(e.target.value) / 100 })}
-          />
-        </Stack>
-        <Stack label="Tenant Rep (%)">
-          <Input
-            type="number"
-            step={0.01}
-            className="h-8 px-2 text-sm"
-            value={(globals.lcTenantRepPercent * 100).toFixed(2)}
-            onChange={(e) => update({ lcTenantRepPercent: Number(e.target.value) / 100 })}
           />
         </Stack>
         <Stack label="LC Calc">
@@ -222,8 +215,11 @@ function Section({ section, scenarios }: SectionProps) {
       {/* Header row — field labels */}
       <div className="grid items-end gap-2" style={gridStyle}>
         <div />
-        {section.fields.map((f) => (
-          <div key={f.field as string} className="text-[11px] text-[var(--color-muted-foreground)]">
+        {section.fields.map((f, idx) => (
+          <div
+            key={fieldKey(f, idx)}
+            className="text-[11px] text-[var(--color-muted-foreground)]"
+          >
             {f.label}
           </div>
         ))}
@@ -235,13 +231,22 @@ function Section({ section, scenarios }: SectionProps) {
           <div className="truncate text-sm font-medium" title={sc.name}>
             {sc.name}
           </div>
-          {section.fields.map((f) => (
-            <Cell key={f.field as string} field={f} scenarioId={sc.id} inputs={sc.inputs} />
+          {section.fields.map((f, idx) => (
+            <Cell
+              key={fieldKey(f, idx)}
+              field={f}
+              scenarioId={sc.id}
+              inputs={sc.inputs}
+            />
           ))}
         </div>
       ))}
     </div>
   );
+}
+
+function fieldKey(f: FieldDef, idx: number): string {
+  return f.field ? (f.field as string) : `derived-${idx}-${f.label}`;
 }
 
 interface CellProps {
@@ -252,7 +257,28 @@ interface CellProps {
 
 function Cell({ field, scenarioId, inputs }: CellProps) {
   const updateInput = useAppStore((s) => s.updateInput);
-  const { field: key, type = "number", step = 1, percent = false, optional = false } = field;
+
+  // Derived/read-only cell — computed from current inputs, can't be edited.
+  if (field.compute) {
+    const v = field.compute(inputs);
+    let text: string;
+    if (field.computeFormat === "percent") {
+      text = `${v.toFixed(2)}%`;
+    } else if (field.computeFormat === "currency") {
+      text = `$${v.toFixed(2)}`;
+    } else {
+      text = String(v);
+    }
+    return (
+      <div className="flex h-8 items-center px-2 text-sm tabular-nums text-[var(--color-muted-foreground)]">
+        {text}
+      </div>
+    );
+  }
+
+  const key = field.field;
+  if (!key) return null; // unreachable: editable field requires `field` set
+  const { type = "number", step = 1, percent = false, optional = false } = field;
 
   const renderValue = (): string => {
     const raw = inputs[key];

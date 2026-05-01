@@ -29,8 +29,6 @@ import type { FreeVariable } from "./solver";
 
 const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
-  lcLLRepPercent: 0.045,
-  lcTenantRepPercent: 0.045,
   shellCostPSF: 140,
   lcStructure: "split50",
   lcCalculation: "tiered",
@@ -47,6 +45,8 @@ const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): Scena
     proposedLeaseSF: 300_000,
     baseRatePSF: 7,
     escalation: 0.03,
+    lcLLRepPercent: 0.045,
+    lcTenantRepPercent: 0.045,
     tiAllowancePSF: 5,
     freeRentMonths: 4,
     leaseTermMonths: 125,
@@ -242,7 +242,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 9,
+      version: 10,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -266,6 +266,9 @@ export const useAppStore = create<AppStore>()(
       //          previously-loaded data simply isn't there.
       // v8 → v9: drop scenarios.{escalationFloor, escalationCap} (CPI collar
       //          removed from the model — the fields are dead).
+      // v9 → v10: lift globals.lcLLRepPercent + lcTenantRepPercent into each
+      //           scenario's inputs. Different deals may have different
+      //           commission structures (e.g. a direct-to-LL deal with no TR).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -299,22 +302,18 @@ export const useAppStore = create<AppStore>()(
           }));
         }
         if (state && version < 6 && state.globals) {
-          const old = state.globals as Partial<Globals> & { lcPercent?: number };
-          if (old.lcPercent != null) {
-            const total = old.lcPercent;
-            state.globals = {
-              ...state.globals,
-              lcLLRepPercent: total / 2,
-              lcTenantRepPercent: total / 2,
-            };
-            delete (state.globals as { lcPercent?: number }).lcPercent;
+          // Migration to a now-deprecated globals shape (lcLLRepPercent +
+          // lcTenantRepPercent on globals). v10 moves them onto inputs;
+          // we still need to populate them here so v9→v10 finds them.
+          const g = state.globals as unknown as Record<string, unknown>;
+          if (typeof g.lcPercent === "number") {
+            const total = g.lcPercent;
+            g.lcLLRepPercent = total / 2;
+            g.lcTenantRepPercent = total / 2;
+            delete g.lcPercent;
           } else {
-            // No prior lcPercent (corrupt or fresh) — fall back to defaults.
-            state.globals = {
-              ...state.globals,
-              lcLLRepPercent: state.globals.lcLLRepPercent ?? 0.045,
-              lcTenantRepPercent: state.globals.lcTenantRepPercent ?? 0.045,
-            };
+            if (typeof g.lcLLRepPercent !== "number") g.lcLLRepPercent = 0.045;
+            if (typeof g.lcTenantRepPercent !== "number") g.lcTenantRepPercent = 0.045;
           }
         }
         if (state && version < 8 && !Array.isArray(state.deals)) {
@@ -331,6 +330,26 @@ export const useAppStore = create<AppStore>()(
             void _c;
             return { ...sc, inputs: rest };
           });
+        }
+        if (state && version < 10 && state.scenarios && state.globals) {
+          const oldGlobals = state.globals as Globals & {
+            lcLLRepPercent?: number;
+            lcTenantRepPercent?: number;
+          };
+          const llRep = oldGlobals.lcLLRepPercent ?? 0.045;
+          const trRep = oldGlobals.lcTenantRepPercent ?? 0.045;
+          state.scenarios = state.scenarios.map((sc) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              lcLLRepPercent:
+                (sc.inputs as Partial<ScenarioInputs>).lcLLRepPercent ?? llRep,
+              lcTenantRepPercent:
+                (sc.inputs as Partial<ScenarioInputs>).lcTenantRepPercent ?? trRep,
+            },
+          }));
+          delete (state.globals as { lcLLRepPercent?: number }).lcLLRepPercent;
+          delete (state.globals as { lcTenantRepPercent?: number }).lcTenantRepPercent;
         }
         return state as unknown as PersistedState;
       },

@@ -13,8 +13,6 @@ import type { Globals, ScenarioInputs } from "./types";
 
 const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   discountRate: 0.08,
-  lcLLRepPercent: 0.045,
-  lcTenantRepPercent: 0.045,
   shellCostPSF: 140,
   lcStructure: "upfront",
   lcCalculation: "tiered",
@@ -32,6 +30,8 @@ const proposalInputs: ScenarioInputs = {
   proposedLeaseSF: 300_000,
   baseRatePSF: 8,
   escalation: 0.04,
+  lcLLRepPercent: 0.045,
+  lcTenantRepPercent: 0.045,
   tiAllowancePSF: 10,
   freeRentMonths: 6,
   leaseTermMonths: 130,
@@ -49,6 +49,8 @@ const uwInputs: ScenarioInputs = {
   proposedLeaseSF: 300_000,
   baseRatePSF: 7,
   escalation: 0.03,
+  lcLLRepPercent: 0.045,
+  lcTenantRepPercent: 0.045,
   tiAllowancePSF: 5,
   freeRentMonths: 4,
   leaseTermMonths: 125,
@@ -349,8 +351,14 @@ describe("edge cases", () => {
 
   it("zero free rent + zero TI + zero LC% → NER ≈ avg rate", () => {
     const r = runScenario(
-      { ...proposalInputs, freeRentMonths: 0, tiAllowancePSF: 0 },
-      makeGlobals({ lcLLRepPercent: 0, lcTenantRepPercent: 0 }),
+      {
+        ...proposalInputs,
+        freeRentMonths: 0,
+        tiAllowancePSF: 0,
+        lcLLRepPercent: 0,
+        lcTenantRepPercent: 0,
+      },
+      makeGlobals(),
     );
     expect(r.undiscountedNER).toBeCloseTo(r.totals.avgRatePSF, 4);
   });

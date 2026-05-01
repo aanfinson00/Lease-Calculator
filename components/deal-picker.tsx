@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Database, Search, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { dealAsScenarioPatch, dealLCSplit, parseDeals, type Deal } from "@/lib/deals";
+import { dealAsScenarioPatch, parseDeals, type Deal } from "@/lib/deals";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +50,6 @@ export function DealPicker({
   const setDeals = useAppStore((s) => s.setDeals);
   const clearDeals = useAppStore((s) => s.clearDeals);
   const updateInput = useAppStore((s) => s.updateInput);
-  const updateGlobals = useAppStore((s) => s.updateGlobals);
 
   // Focus search on open (only when deals are already loaded).
   useEffect(() => {
@@ -90,7 +89,6 @@ export function DealPicker({
     for (const [k, v] of Object.entries(patch)) {
       updateInput(scenarioId, k as keyof typeof patch, v as never);
     }
-    updateGlobals(dealLCSplit(deal));
     setOpen(false);
     setQuery("");
   };

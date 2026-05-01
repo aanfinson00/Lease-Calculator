@@ -127,8 +127,9 @@ export function parseUSDate(s: string): string {
 
 /**
  * Returns the partial ScenarioInputs that should overwrite the scenario when
- * the user picks this deal. The caller merges this onto existing inputs and
- * also writes `globals.lc{LL,Tenant}RepPercent` from `effectiveLCSplit(deal)`.
+ * the user picks this deal. The deal's total LC% is split 50/50 into
+ * Landlord Rep + Tenant Rep — adjust after if the deal was direct-to-LL with
+ * no co-broke (zero out tenantRepPercent and put the full % on LL).
  */
 export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
   return {
@@ -139,6 +140,8 @@ export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
     proposedLeaseSF: deal.leaseSF,
     baseRatePSF: deal.baseRatePSF,
     escalation: deal.escalation,
+    lcLLRepPercent: deal.lcPercent / 2,
+    lcTenantRepPercent: deal.lcPercent / 2,
     leaseTermMonths: deal.leaseTermMonths,
     leaseCommencement: deal.commencement,
     leaseExecutionDate: deal.commencement,
@@ -149,13 +152,5 @@ export function dealAsScenarioPatch(deal: Deal): Partial<ScenarioInputs> {
     rentScheduleOverride: undefined,
     freeRentStartMonth: 1,
     tiDurationMonths: 1,
-  };
-}
-
-/** Split the deal's total LC into LL Rep + Tenant Rep, 50/50. */
-export function dealLCSplit(deal: Deal): { lcLLRepPercent: number; lcTenantRepPercent: number } {
-  return {
-    lcLLRepPercent: deal.lcPercent / 2,
-    lcTenantRepPercent: deal.lcPercent / 2,
   };
 }

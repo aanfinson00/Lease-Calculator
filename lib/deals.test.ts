@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dealAsScenarioPatch, dealLCSplit, parseDeals, parseUSDate } from "./deals";
+import { dealAsScenarioPatch, parseDeals, parseUSDate } from "./deals";
 
 const HEADER =
   "Code,Deal Name,Tenant Name,Project SF,Building SF,Lease SF,Untrended Rent,Trended Rent,Annual Growth,Lease Term,Start Month Post Completion,Starting Month,Start Month (Date),Free Rent (months),TIs,LCs,LC Override,Rent Escalations,MLA,Status";
@@ -104,24 +104,23 @@ describe("dealAsScenarioPatch", () => {
     expect(patch.tiDurationMonths).toBe(1);
   });
 
+  it("splits the deal's LC into Landlord Rep + Tenant Rep, 50/50", () => {
+    expect(patch.lcLLRepPercent).toBe(0.03);
+    expect(patch.lcTenantRepPercent).toBe(0.03);
+    expect((patch.lcLLRepPercent ?? 0) + (patch.lcTenantRepPercent ?? 0)).toBe(0.06);
+  });
+
   it("sets the scenario name to the deal code (renames whatever was there)", () => {
     expect(patch.name).toBe("Deal01-4-01");
     expect(patch.dealCode).toBe("Deal01-4-01");
   });
 });
 
-describe("dealLCSplit", () => {
-  it("splits the deal's LC% 50/50 into LL Rep + Tenant Rep", () => {
-    const deal = parseDeals(`${HEADER}\n${ROW_LEASE}`)[0]!;
-    const split = dealLCSplit(deal);
-    expect(split.lcLLRepPercent).toBe(0.03);
-    expect(split.lcTenantRepPercent).toBe(0.03);
-    expect(split.lcLLRepPercent + split.lcTenantRepPercent).toBe(deal.lcPercent);
-  });
-
-  it("respects the LC Override too", () => {
+describe("dealAsScenarioPatch — LC handling", () => {
+  it("respects LC Override when present (sums to override, not LCs)", () => {
     const deal = parseDeals(`${HEADER}\n${ROW_OVERRIDE}`)[0]!;
-    const split = dealLCSplit(deal);
-    expect(split.lcLLRepPercent + split.lcTenantRepPercent).toBe(0.015);
+    const patch = dealAsScenarioPatch(deal);
+    const total = (patch.lcLLRepPercent ?? 0) + (patch.lcTenantRepPercent ?? 0);
+    expect(total).toBe(0.015);
   });
 });
