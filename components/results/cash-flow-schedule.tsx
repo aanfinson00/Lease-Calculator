@@ -52,7 +52,6 @@ export function CashFlowSchedule({ a, b }: Props) {
 }
 
 function ScheduleTable({ name, inputs, results }: ScenarioPair) {
-  const sf = inputs.proposedLeaseSF;
   const commencementOffset = monthsBetween(
     new Date(inputs.leaseExecutionDate),
     new Date(inputs.leaseCommencement),
@@ -69,12 +68,12 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
   const span = offset + inputs.leaseTermMonths;
   const rows = results.grid.slice(0, span);
 
-  // Totals across the full lease span ($), used in the right-most "Total" col.
+  // Totals across the full lease span ($/SF), used in the right-most "Total" col.
   const totals = rows.reduce(
     (acc, r) => {
-      acc.base += r.baseRentPSF * sf;
-      acc.ti += r.tiPSF * sf;
-      acc.lc += r.lcPSF * sf;
+      acc.base += r.baseRentPSF;
+      acc.ti += r.tiPSF;
+      acc.lc += r.lcPSF;
       return acc;
     },
     { base: 0, ti: 0, lc: 0 },
@@ -89,8 +88,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
           Execution {inputs.leaseExecutionDate} · Commencement {inputs.leaseCommencement}
           {free > 0 && freeStart === 1 && ` · Rent Comm. M${rcMonth}`}
           {free > 0 && freeStart > 1 && ` · Free M${abatementStartMonth}–M${abatementEndMonth}`}
-          {" · "}
-          {sf.toLocaleString("en-US")} SF
+          {" · all values $/SF"}
         </span>
       </div>
       <div className="overflow-x-auto rounded-md border">
@@ -168,7 +166,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
           <tbody>
             <Row
               label="Base Rent"
-              values={rows.map((r) => r.baseRentPSF * sf)}
+              values={rows.map((r) => r.baseRentPSF)}
               total={totals.base}
               offset={offset}
               rcMonth={rcMonth}
@@ -176,7 +174,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
             />
             <Row
               label="TI Draw"
-              values={rows.map((r) => r.tiPSF * sf)}
+              values={rows.map((r) => r.tiPSF)}
               total={totals.ti}
               offset={offset}
               rcMonth={rcMonth}
@@ -184,7 +182,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
             />
             <Row
               label="Commission"
-              values={rows.map((r) => r.lcPSF * sf)}
+              values={rows.map((r) => r.lcPSF)}
               total={totals.lc}
               offset={offset}
               rcMonth={rcMonth}
@@ -192,7 +190,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
             />
             <Row
               label="Net Cash Flow"
-              values={rows.map((r) => (r.baseRentPSF + r.tiPSF + r.lcPSF) * sf)}
+              values={rows.map((r) => r.baseRentPSF + r.tiPSF + r.lcPSF)}
               total={totalNet}
               offset={offset}
               rcMonth={rcMonth}
@@ -264,9 +262,9 @@ function fmtCash(v: number): string {
   if (!Number.isFinite(v) || v === 0) return "—";
   const abs = Math.abs(v);
   const sign = v < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}k`;
-  return `${sign}$${abs.toFixed(0)}`;
+  // PSF amounts: one or two dollars per month at most for monthly rent;
+  // single-digit-to-low-double-digit for term totals. 2 decimals everywhere.
+  return `${sign}$${abs.toFixed(2)}`;
 }
 
 function fmtMonthYear(iso: string): string {
