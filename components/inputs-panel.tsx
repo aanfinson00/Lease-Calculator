@@ -369,20 +369,72 @@ interface SectionProps {
   warningsByScenario: Record<string, Warning[]>;
 }
 
+/**
+ * Per-field direction of "better for the landlord" — drives directional
+ * diff highlighting (green = best across scenarios, red = worst).
+ *
+ * Fields not listed here get neutral diff treatment when values differ
+ * (radios, dates, SF facts, derived cells). Higher rent + escalation +
+ * term = more contracted income; lower TI/free-rent/LC = less LL outflow.
+ */
+const BETTER_DIRECTION: Partial<Record<keyof ScenarioInputs, "higher" | "lower">> = {
+  baseRatePSF: "higher",
+  escalation: "higher",
+  leaseTermMonths: "higher",
+  tiAllowancePSF: "lower",
+  freeRentMonths: "lower",
+  lcLLRepPercent: "lower",
+  lcTenantRepPercent: "lower",
+};
+
+type DiffStatus = "best" | "worst" | "neutral";
+
 function Section({ section, scenarios, warningsByScenario }: SectionProps) {
   // 1 label column + N field columns. Inline style because Tailwind can't
   // produce a class for an arbitrary repeat count at build time.
   const cols = section.fields.length;
   const gridStyle = { gridTemplateColumns: `7.5rem repeat(${cols}, minmax(0, 1fr))` };
 
-  // Diff map: which fields hold different values across scenarios. Used to
-  // accent cells visually so the user can see at a glance what's not the
-  // same between A and B. Skip derived/compute cells (no `field`).
-  const differsByField = new Map<keyof ScenarioInputs, boolean>();
+  // Diff map: per-(scenarioId, field) → "best" / "worst" / "neutral".
+  // "best" and "worst" only apply when the field has a defined direction
+  // and the values across scenarios differ; otherwise we fall back to
+  // "neutral" for differing values and skip highlighting for matches.
+  const diffByScenarioField = new Map<string, Map<keyof ScenarioInputs, DiffStatus>>();
+  for (const sc of scenarios) {
+    diffByScenarioField.set(sc.id, new Map());
+  }
   for (const f of section.fields) {
     if (!f.field) continue;
-    const values = scenarios.map((sc) => String(sc.inputs[f.field!] ?? ""));
-    differsByField.set(f.field, new Set(values).size > 1);
+    const key = f.field;
+    const valuesByScenario = scenarios.map((sc) => ({ id: sc.id, value: sc.inputs[key] }));
+    const uniqueRendered = new Set(valuesByScenario.map((v) => String(v.value ?? "")));
+    if (uniqueRendered.size <= 1) continue; // all the same — no highlight
+
+    const direction = BETTER_DIRECTION[key];
+    const numericValues = valuesByScenario
+      .map((v) => (typeof v.value === "number" ? v.value : Number.NaN))
+      .filter((n) => Number.isFinite(n));
+
+    if (!direction || numericValues.length !== valuesByScenario.length) {
+      // No direction or non-numeric → neutral (just "differs").
+      for (const v of valuesByScenario) {
+        diffByScenarioField.get(v.id)!.set(key, "neutral");
+      }
+      continue;
+    }
+
+    const bestValue = direction === "higher" ? Math.max(...numericValues) : Math.min(...numericValues);
+    const worstValue = direction === "higher" ? Math.min(...numericValues) : Math.max(...numericValues);
+    for (const v of valuesByScenario) {
+      const n = v.value as number;
+      const status: DiffStatus =
+        n === bestValue && n !== worstValue
+          ? "best"
+          : n === worstValue && n !== bestValue
+            ? "worst"
+            : "neutral";
+      diffByScenarioField.get(v.id)!.set(key, status);
+    }
   }
 
   return (
@@ -408,6 +460,7 @@ function Section({ section, scenarios, warningsByScenario }: SectionProps) {
       {/* One row per scenario */}
       {scenarios.map((sc) => {
         const scenarioWarnings = warningsByScenario[sc.id] ?? [];
+        const diffByField = diffByScenarioField.get(sc.id)!;
         return (
           <div key={sc.id} className="grid items-center gap-2" style={gridStyle}>
             <div className="truncate text-sm font-medium" title={sc.name}>
@@ -420,7 +473,7 @@ function Section({ section, scenarios, warningsByScenario }: SectionProps) {
                 scenarioId={sc.id}
                 inputs={sc.inputs}
                 warning={f.field ? scenarioWarnings.find((w) => w.field === f.field) : undefined}
-                differs={f.field ? differsByField.get(f.field) === true : false}
+                diffStatus={f.field ? diffByField.get(f.field) : undefined}
               />
             ))}
           </div>
@@ -439,10 +492,10 @@ interface CellProps {
   scenarioId: string;
   inputs: ScenarioInputs;
   warning?: Warning;
-  differs?: boolean;
+  diffStatus?: DiffStatus;
 }
 
-function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
+function Cell({ field, scenarioId, inputs, warning, diffStatus }: CellProps) {
   const updateInput = useAppStore((s) => s.updateInput);
 
   // Derived/read-only cell — computed from current inputs, can't be edited.
@@ -468,7 +521,7 @@ function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
     const key = field.field;
     const current = String(inputs[key] ?? "");
     return (
-      <CellWrapper differs={differs}>
+      <CellWrapper diffStatus={diffStatus}>
         <RadioGroup
           value={current}
           onValueChange={(v) => updateInput(scenarioId, key, v as never)}
@@ -490,7 +543,7 @@ function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
   // Date field — plain text input, no formatting.
   if (field.type === "date") {
     return (
-      <CellWrapper warning={warning} differs={differs}>
+      <CellWrapper warning={warning} diffStatus={diffStatus}>
         <Input
           type="date"
           value={String(inputs[key] ?? "")}
@@ -504,7 +557,7 @@ function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
   // Numeric input with focus-aware formatting.
   const raw = inputs[key];
   return (
-    <CellWrapper warning={warning} differs={differs}>
+    <CellWrapper warning={warning} diffStatus={diffStatus}>
       <FormattedNumberInput
         value={typeof raw === "number" ? raw : undefined}
         onChange={(v) => updateInput(scenarioId, key, (v as unknown) as never)}
@@ -519,21 +572,29 @@ function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
 
 /**
  * Wraps an input with optional treatments: a `!` indicator when the field
- * has a warning, and a left-border accent when this field's value differs
- * across the compared scenarios.
+ * has a warning, and a directional left-border accent when this field's
+ * value differs across the compared scenarios — green = best for the
+ * landlord, red = worst, primary = differs but no clear "better" direction
+ * (radios, dates, SF facts).
  */
 function CellWrapper({
   warning,
-  differs,
+  diffStatus,
   children,
 }: {
   warning?: Warning;
-  differs?: boolean;
+  diffStatus?: DiffStatus;
   children: React.ReactNode;
 }) {
-  const accent = differs
-    ? "border-l-2 border-[var(--color-primary)] pl-1"
-    : undefined;
+  const accentColor =
+    diffStatus === "best"
+      ? "border-[var(--color-success)]"
+      : diffStatus === "worst"
+        ? "border-[var(--color-cost)]"
+        : diffStatus === "neutral"
+          ? "border-[var(--color-primary)]"
+          : undefined;
+  const accent = accentColor ? cn("border-l-2 pl-1", accentColor) : undefined;
 
   if (!warning) {
     if (!accent) return <>{children}</>;
