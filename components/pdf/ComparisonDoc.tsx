@@ -130,10 +130,11 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
     { name: "Net CF", base: 0, value: waterfall.netCashFlow, color: "#059669" },
   ];
 
-  // Chart geometry
-  const W = 240;
+  // Chart geometry. Sized to fit a half-page column on LETTER (~248pt
+  // inner width inside the card padding) with a small breathing margin.
+  const W = 220;
   const H = 110;
-  const padX = 18;
+  const padX = 14;
   const padY = 12;
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
@@ -314,40 +315,44 @@ export function ComparisonDoc({
           </View>
         </View>
 
-        {/* Headline metrics */}
-        <Text style={styles.sectionTitle}>Headline metrics</Text>
-        <View style={styles.table}>
-          <View style={styles.rowHeader}>
-            <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
-          </View>
-          {headlineRows.map((r) => {
-            const delta = r.b - r.a;
-            return (
-              <View key={r.label} style={styles.row}>
-                <Text style={styles.cellLabel}>{r.label}</Text>
-                <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
-                <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
-                <Text
-                  style={[
-                    styles.cellNum,
-                    delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
-                  ]}
-                >
-                  {fmtPctChange(r.a, r.b)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* Waterfalls */}
-        <Text style={styles.sectionTitle}>NER waterfall (PSF over term)</Text>
+        {/* Stats on the left, NER waterfalls stacked vertically on the right */}
+        <Text style={styles.sectionTitle}>Headline metrics & NER waterfall (PSF over term)</Text>
         <View style={styles.twoCol}>
-          <PdfWaterfall title={aName} waterfall={aResults.waterfall} />
-          <PdfWaterfall title={bName} waterfall={bResults.waterfall} />
+          {/* LEFT — headline metrics table */}
+          <View style={{ flex: 1 }}>
+            <View style={styles.table}>
+              <View style={styles.rowHeader}>
+                <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
+                <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
+                <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
+                <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
+              </View>
+              {headlineRows.map((r) => {
+                const delta = r.b - r.a;
+                return (
+                  <View key={r.label} style={styles.row}>
+                    <Text style={styles.cellLabel}>{r.label}</Text>
+                    <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
+                    <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
+                    <Text
+                      style={[
+                        styles.cellNum,
+                        delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
+                      ]}
+                    >
+                      {fmtPctChange(r.a, r.b)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* RIGHT — two waterfalls stacked vertically */}
+          <View style={{ flex: 1, flexDirection: "column", gap: 8 }}>
+            <PdfWaterfall title={aName} waterfall={aResults.waterfall} />
+            <PdfWaterfall title={bName} waterfall={bResults.waterfall} />
+          </View>
         </View>
 
         {/* Deal assumptions — every input that drives the calc, side by side */}

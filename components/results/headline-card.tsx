@@ -90,7 +90,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
         <CardTitle>Headline Metrics · {bName} vs {aName}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {metrics.map((m) => (
             <Tile key={m.label} metric={m} aName={aName} bName={bName} />
           ))}

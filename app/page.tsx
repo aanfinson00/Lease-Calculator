@@ -72,25 +72,21 @@ export default function Home() {
         <ScenarioBar />
       </header>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* Stats — KPI tiles + inputs grid stacked on the left */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr),minmax(0,1.2fr)]">
+        <InputsPanel />
         <div className="flex flex-col gap-5">
           {a && b && aResults && bResults && (
-            <HeadlineCard
-              aName={a.inputs.name}
-              aResults={aResults}
-              bName={b.inputs.name}
-              bResults={bResults}
-            />
-          )}
-          <InputsPanel />
-        </div>
-        {/* Charts — waterfalls stacked vertically on the right */}
-        <div className="flex flex-col gap-4">
-          {a && b && aResults && bResults && (
             <>
-              <WaterfallChart title={a.inputs.name} waterfall={aResults.waterfall} />
-              <WaterfallChart title={b.inputs.name} waterfall={bResults.waterfall} />
+              <HeadlineCard
+                aName={a.inputs.name}
+                aResults={aResults}
+                bName={b.inputs.name}
+                bResults={bResults}
+              />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <WaterfallChart title={a.inputs.name} waterfall={aResults.waterfall} />
+                <WaterfallChart title={b.inputs.name} waterfall={bResults.waterfall} />
+              </div>
             </>
           )}
         </div>
