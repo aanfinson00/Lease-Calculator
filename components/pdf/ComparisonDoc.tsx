@@ -9,8 +9,8 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
-import type { ScenarioResults, WaterfallComponents } from "@/lib/types";
-import { fmtCurrency, fmtPercent, fmtPSF } from "@/lib/format";
+import type { Globals, ScenarioInputs, ScenarioResults, WaterfallComponents } from "@/lib/types";
+import { fmtCurrency, fmtNumber, fmtPercent, fmtPSF } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
 // Styles (react-pdf uses a flexbox-ish subset; values are points)
@@ -59,6 +59,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
     borderBottomWidth: 1,
     borderColor: "#cbd5e1",
+  },
+  rowSubheader: {
+    flexDirection: "row",
+    paddingVertical: 3,
+    paddingTop: 6,
+    borderBottomWidth: 0.5,
+    borderColor: "#e2e8f0",
+  },
+  sectionLabel: {
+    fontSize: 8,
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   cellLabel: { flex: 1.6, paddingHorizontal: 4 },
   cellNum: { flex: 1, paddingHorizontal: 4, textAlign: "right" },
@@ -171,23 +184,42 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
 interface DocProps {
   propertyName: string;
   aName: string;
+  aInputs: ScenarioInputs;
   aResults: ScenarioResults;
   bName: string;
+  bInputs: ScenarioInputs;
   bResults: ScenarioResults;
+  globals: Globals;
 }
 
-const fmtSigned = (v: number, fractionDigits = 2): string => {
-  if (!Number.isFinite(v)) return "—";
-  const sign = v > 0 ? "+" : v < 0 ? "" : "";
-  return `${sign}${fmtCurrency(v, fractionDigits)}`;
+/**
+ * Render `(b - a) / a` as a signed percent string, e.g. "+12.34%" or
+ * "−4.10%". Returns "—" when A is zero (denominator) or either value
+ * isn't finite.
+ */
+const fmtPctChange = (a: number, b: number): string => {
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return "—";
+  const pct = ((b - a) / Math.abs(a)) * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(2)}%`;
+};
+
+const fmtDate = (iso: string | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
 export function ComparisonDoc({
   propertyName,
   aName,
+  aInputs,
   aResults,
   bName,
+  bInputs,
   bResults,
+  globals,
 }: DocProps) {
   const headlineRows = [
     {
@@ -195,36 +227,68 @@ export function ComparisonDoc({
       a: aResults.undiscountedNER,
       b: bResults.undiscountedNER,
       fmt: (v: number) => fmtPSF(v, 2),
-      delta: bResults.undiscountedNER - aResults.undiscountedNER,
     },
     {
       label: "Discounted NER",
       a: aResults.discountedNER,
       b: bResults.discountedNER,
       fmt: (v: number) => fmtPSF(v, 2),
-      delta: bResults.discountedNER - aResults.discountedNER,
     },
     {
       label: "Yield on Cost (Yr 1)",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       fmt: (v: number) => fmtPercent(v, 2),
-      delta: bResults.yocYr1 - aResults.yocYr1,
     },
     {
       label: "Yield on Cost (Term)",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       fmt: (v: number) => fmtPercent(v, 2),
-      delta: bResults.yocTerm - aResults.yocTerm,
     },
     {
       label: "Total Basis ($/SF)",
       a: aResults.totalBasisPSF,
       b: bResults.totalBasisPSF,
       fmt: (v: number) => fmtPSF(v, 2),
-      delta: bResults.totalBasisPSF - aResults.totalBasisPSF,
     },
+  ];
+
+  // Per-deal assumptions for the side-by-side table. Mix of input and
+  // global fields, with formatters chosen to match the on-screen inputs
+  // panel (currency for $, percent for %, etc.).
+  const assumptionRows: Array<{
+    label: string;
+    a: string;
+    b: string;
+    section?: string;
+  }> = [
+    { section: "Square Footage", label: "Project SF", a: fmtNumber(aInputs.projectSF, 0), b: fmtNumber(bInputs.projectSF, 0) },
+    { label: "Building SF", a: fmtNumber(aInputs.buildingSF, 0), b: fmtNumber(bInputs.buildingSF, 0) },
+    { label: "Lease SF", a: fmtNumber(aInputs.proposedLeaseSF, 0), b: fmtNumber(bInputs.proposedLeaseSF, 0) },
+
+    { section: "Rent", label: "Base Rate ($/SF)", a: fmtCurrency(aInputs.baseRatePSF, 2), b: fmtCurrency(bInputs.baseRatePSF, 2) },
+    { label: "Escalation (annual)", a: fmtPercent(aInputs.escalation * 100, 2), b: fmtPercent(bInputs.escalation * 100, 2) },
+
+    { section: "Concessions", label: "TI Allowance ($/SF)", a: fmtCurrency(aInputs.tiAllowancePSF, 2), b: fmtCurrency(bInputs.tiAllowancePSF, 2) },
+    { label: "TI Duration (mo)", a: fmtNumber(aInputs.tiDurationMonths, 0), b: fmtNumber(bInputs.tiDurationMonths, 0) },
+    { label: "Free Rent (mo)", a: fmtNumber(aInputs.freeRentMonths, 0), b: fmtNumber(bInputs.freeRentMonths, 0) },
+
+    { section: "Leasing Commissions", label: "Landlord Rep (%)", a: fmtPercent(aInputs.lcLLRepPercent * 100, 2), b: fmtPercent(bInputs.lcLLRepPercent * 100, 2) },
+    { label: "Tenant Rep (%)", a: fmtPercent(aInputs.lcTenantRepPercent * 100, 2), b: fmtPercent(bInputs.lcTenantRepPercent * 100, 2) },
+    { label: "Combined LC (%)", a: fmtPercent((aInputs.lcLLRepPercent + aInputs.lcTenantRepPercent) * 100, 2), b: fmtPercent((bInputs.lcLLRepPercent + bInputs.lcTenantRepPercent) * 100, 2) },
+    { label: "LC Calc", a: aInputs.lcCalculation === "tiered" ? "Tiered" : "Flat", b: bInputs.lcCalculation === "tiered" ? "Tiered" : "Flat" },
+    { label: "LC Payment", a: aInputs.lcStructure === "split50" ? "50/50" : "Upfront", b: bInputs.lcStructure === "split50" ? "50/50" : "Upfront" },
+
+    { section: "Term", label: "Term (mo)", a: fmtNumber(aInputs.leaseTermMonths, 0), b: fmtNumber(bInputs.leaseTermMonths, 0) },
+    { label: "Execution date", a: fmtDate(aInputs.leaseExecutionDate), b: fmtDate(bInputs.leaseExecutionDate) },
+    { label: "Commencement date", a: fmtDate(aInputs.leaseCommencement), b: fmtDate(bInputs.leaseCommencement) },
+
+    { section: "Shared assumptions", label: "Land ($/SF)", a: fmtCurrency(globals.landCostPSF, 2), b: fmtCurrency(globals.landCostPSF, 2) },
+    { label: "Shell ($/SF)", a: fmtCurrency(globals.shellCostPSF, 2), b: fmtCurrency(globals.shellCostPSF, 2) },
+    { label: "Soft Costs ($/SF)", a: fmtCurrency(globals.softCostsPSF, 2), b: fmtCurrency(globals.softCostsPSF, 2) },
+    { label: "Discount rate", a: fmtPercent(globals.discountRate * 100, 2), b: fmtPercent(globals.discountRate * 100, 2) },
+    { label: "Total Basis ($/SF)", a: fmtCurrency(aResults.totalBasisPSF, 2), b: fmtCurrency(bResults.totalBasisPSF, 2) },
   ];
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -232,8 +296,6 @@ export function ComparisonDoc({
     day: "numeric",
     year: "numeric",
   });
-
-  const maxYears = Math.max(aResults.schedule.length, bResults.schedule.length);
 
   return (
     <Document title={`${propertyName || "RFP"} Comparison`} author="RFP Analyzer">
@@ -259,23 +321,26 @@ export function ComparisonDoc({
             <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
             <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
             <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>Δ (B − A)</Text>
+            <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
           </View>
-          {headlineRows.map((r) => (
-            <View key={r.label} style={styles.row}>
-              <Text style={styles.cellLabel}>{r.label}</Text>
-              <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
-              <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
-              <Text
-                style={[
-                  styles.cellNum,
-                  r.delta > 0 ? styles.positive : r.delta < 0 ? styles.negative : {},
-                ]}
-              >
-                {r.label.includes("Yield") ? fmtPercent(r.delta, 2) : fmtSigned(r.delta, 2)}
-              </Text>
-            </View>
-          ))}
+          {headlineRows.map((r) => {
+            const delta = r.b - r.a;
+            return (
+              <View key={r.label} style={styles.row}>
+                <Text style={styles.cellLabel}>{r.label}</Text>
+                <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
+                <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
+                <Text
+                  style={[
+                    styles.cellNum,
+                    delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
+                  ]}
+                >
+                  {fmtPctChange(r.a, r.b)}
+                </Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* Waterfalls */}
@@ -285,36 +350,30 @@ export function ComparisonDoc({
           <PdfWaterfall title={bName} waterfall={bResults.waterfall} />
         </View>
 
-        {/* Annual schedule (compact) */}
-        <Text style={styles.sectionTitle}>Annual rent schedule</Text>
+        {/* Deal assumptions — every input that drives the calc, side by side */}
+        <Text style={styles.sectionTitle}>Deal assumptions</Text>
         <View style={styles.table}>
           <View style={styles.rowHeader}>
-            <Text style={[styles.cellLabel, styles.bold]}>Year</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{aName} Rate</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{aName} Mo</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{bName} Rate</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{bName} Mo</Text>
+            <Text style={[styles.cellLabel, styles.bold]}>Assumption</Text>
+            <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
+            <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
           </View>
-          {Array.from({ length: maxYears }).map((_, i) => {
-            const aRow = aResults.schedule[i];
-            const bRow = bResults.schedule[i];
-            const yearLabel =
-              (aRow ?? bRow)?.year === 0 ? "Free Rent" : `Year ${(aRow ?? bRow)?.year}`;
+          {assumptionRows.map((r, i) => {
+            const differs = r.a !== r.b;
             return (
-              <View key={i} style={styles.row}>
-                <Text style={styles.cellLabel}>{yearLabel}</Text>
-                <Text style={styles.cellNum}>
-                  {aRow ? fmtCurrency(aRow.annualRatePSF, 2) : "—"}
-                </Text>
-                <Text style={[styles.cellNum, styles.cellMuted]}>
-                  {aRow ? aRow.monthsActive : "—"}
-                </Text>
-                <Text style={styles.cellNum}>
-                  {bRow ? fmtCurrency(bRow.annualRatePSF, 2) : "—"}
-                </Text>
-                <Text style={[styles.cellNum, styles.cellMuted]}>
-                  {bRow ? bRow.monthsActive : "—"}
-                </Text>
+              <View key={`${i}-${r.label}`}>
+                {r.section && (
+                  <View style={styles.rowSubheader}>
+                    <Text style={[styles.cellLabel, styles.bold, styles.sectionLabel]}>
+                      {r.section}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.row} wrap={false}>
+                  <Text style={styles.cellLabel}>{r.label}</Text>
+                  <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.a}</Text>
+                  <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.b}</Text>
+                </View>
               </View>
             );
           })}

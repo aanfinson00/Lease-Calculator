@@ -38,9 +38,12 @@ export function ExportPdfButton() {
         <ComparisonDoc
           propertyName={propertyName}
           aName={a.inputs.name}
+          aInputs={a.inputs}
           aResults={aResults}
           bName={b.inputs.name}
+          bInputs={b.inputs}
           bResults={bResults}
+          globals={globals}
         />,
       ).toBlob();
 
