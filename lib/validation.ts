@@ -39,7 +39,24 @@ export function validateScenario(inputs: ScenarioInputs): Warning[] {
 
   const exec = new Date(inputs.leaseExecutionDate);
   const comm = new Date(inputs.leaseCommencement);
-  if (Number.isFinite(exec.getTime()) && Number.isFinite(comm.getTime()) && exec > comm) {
+  const execValid = Number.isFinite(exec.getTime());
+  const commValid = Number.isFinite(comm.getTime());
+
+  if (!execValid) {
+    out.push({
+      field: "leaseExecutionDate",
+      severity: "warn",
+      message: "Execution date is empty or invalid. Calc collapses execution-to-commencement to zero — TI and 50% LC are paid in month 1.",
+    });
+  }
+  if (!commValid) {
+    out.push({
+      field: "leaseCommencement",
+      severity: "warn",
+      message: "Commencement date is empty or invalid. Schedule and rent timing won't be reliable.",
+    });
+  }
+  if (execValid && commValid && exec > comm) {
     out.push({
       field: "leaseExecutionDate",
       severity: "warn",

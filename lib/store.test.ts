@@ -24,7 +24,9 @@ function resetStore() {
     property: { name: "" },
     globals: {
       discountRate: 0.08,
+      landCostPSF: 0,
       shellCostPSF: 140,
+      softCostsPSF: 0,
       horizonMonths: 204,
     },
     deals: [],

@@ -50,16 +50,42 @@ const SECTIONS: SectionDef[] = [
   {
     title: "Rent",
     fields: [
-      { field: "baseRatePSF", label: "Base Rate ($/SF)", format: "currency" },
-      { field: "escalation", label: "Escalation (%)", percent: true, format: "percent" },
+      {
+        field: "baseRatePSF",
+        label: "Base Rate ($/SF)",
+        format: "currency",
+        help: "Year-1 contracted base rent per SF (annual). Subsequent years escalate per the Escalation field unless overridden in the Rent Schedule.",
+      },
+      {
+        field: "escalation",
+        label: "Escalation (%)",
+        percent: true,
+        format: "percent",
+        help: "Annual rent escalation, compounded yearly: rate(year) = Base × (1 + Esc)^(year − 1).",
+      },
     ],
   },
   {
     title: "Concessions",
     fields: [
-      { field: "tiAllowancePSF", label: "TI Allowance ($/SF)", format: "currency" },
-      { field: "tiDurationMonths", label: "TI Duration (mo)", format: "integer" },
-      { field: "freeRentMonths", label: "Free Rent (mo)", format: "integer" },
+      {
+        field: "tiAllowancePSF",
+        label: "TI Allowance ($/SF)",
+        format: "currency",
+        help: "Tenant improvement dollars per SF the landlord funds. Paid out evenly across the TI Duration window starting at lease execution.",
+      },
+      {
+        field: "tiDurationMonths",
+        label: "TI Duration (mo)",
+        format: "integer",
+        help: "How many months the TI dollars are spread over, starting at lease execution. 1 = single lump-sum draw on day 1 (default — calc clamps 0 to 1).",
+      },
+      {
+        field: "freeRentMonths",
+        label: "Free Rent (mo)",
+        format: "integer",
+        help: "Months of full base-rent abatement, always front-loaded (months 1..N from commencement). Does not extend the lease term.",
+      },
     ],
   },
   {
@@ -71,6 +97,7 @@ const SECTIONS: SectionDef[] = [
         label: "Combined (%)",
         compute: (i) => (i.lcLLRepPercent + i.lcTenantRepPercent) * 100,
         computeFormat: "percent",
+        help: "Sum of Landlord Rep + Tenant Rep. This is the rate applied to contracted rent under both the Tiered and Flat calc methods.",
       },
       {
         field: "lcCalculation",
@@ -83,8 +110,9 @@ const SECTIONS: SectionDef[] = [
           <>
             <p className="mb-1 font-semibold">How the LC total is calculated against contracted rent.</p>
             <p className="mb-1">
-              <span className="font-medium">Tiered:</span> full % on the first 60 paying months
-              of contracted rent + half % on month 61 onward. Industrial standard.
+              <span className="font-medium">Tiered:</span> full % on the first 60 PAYING months
+              (free-rent months don't count toward the tier), then half % on paying month 61
+              onward. Industrial standard.
             </p>
             <p>
               <span className="font-medium">Flat:</span> full % on every paying month, no tier
@@ -105,8 +133,10 @@ const SECTIONS: SectionDef[] = [
             <p className="mb-1 font-semibold">When the LC dollars actually hit cash flow.</p>
             <p className="mb-1">
               <span className="font-medium">50/50:</span> half at lease execution, half at lease
-              commencement. Free rent does not delay the second half. If execution and
-              commencement are the same date, both halves collapse to that day.
+              commencement (the rent-start date — the first paying month for the tenant). The
+              second half is paid in cash even though no rent is collected during the free-rent
+              period. If execution and commencement are the same date, both halves collapse to
+              that day.
             </p>
             <p>
               <span className="font-medium">Upfront:</span> 100% at lease execution. Larger
@@ -120,9 +150,34 @@ const SECTIONS: SectionDef[] = [
   {
     title: "Term",
     fields: [
-      { field: "leaseTermMonths", label: "Term (mo)", format: "integer" },
-      { field: "leaseExecutionDate", label: "Execution", type: "date" },
-      { field: "leaseCommencement", label: "Commencement", type: "date" },
+      {
+        field: "leaseTermMonths",
+        label: "Term (mo)",
+        format: "integer",
+        help: "Total lease term in months, INCLUDING any free-rent period. A 130-mo lease with 6 mo free has 124 paying months.",
+      },
+      {
+        field: "leaseExecutionDate",
+        label: "Execution",
+        type: "date",
+        help: (
+          <>
+            <p className="mb-1 font-semibold">Lease signing date.</p>
+            <p>Triggers the start of TI work and the first 50% of LC payment (when LC Payment is set to 50/50). Should be on or before commencement.</p>
+          </>
+        ),
+      },
+      {
+        field: "leaseCommencement",
+        label: "Commencement",
+        type: "date",
+        help: (
+          <>
+            <p className="mb-1 font-semibold">Rent commencement date.</p>
+            <p>Free rent (if any) starts here. The second 50% of LC under the 50/50 structure pays here. Must be on or after the execution date.</p>
+          </>
+        ),
+      },
     ],
   },
 ];
@@ -237,15 +292,41 @@ function DealAssumptions() {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
         Deal Assumptions · shared
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Stack label="Shell ($/SF)">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stack
+          label="Land ($/SF)"
+          help="Land cost per SF. Part of total project basis (denominator for Yield on Cost)."
+        >
+          <FormattedNumberInput
+            value={globals.landCostPSF}
+            onChange={(v) => update({ landCostPSF: v ?? 0 })}
+            format="currency"
+          />
+        </Stack>
+        <Stack
+          label="Shell ($/SF)"
+          help="Bare-shell construction cost per SF. Part of total project basis (denominator for Yield on Cost)."
+        >
           <FormattedNumberInput
             value={globals.shellCostPSF}
             onChange={(v) => update({ shellCostPSF: v ?? 0 })}
             format="currency"
           />
         </Stack>
-        <Stack label="Discount (%)">
+        <Stack
+          label="Soft Costs ($/SF)"
+          help="A&E, permits, financing, contingency, and other non-construction costs that are part of total project basis."
+        >
+          <FormattedNumberInput
+            value={globals.softCostsPSF}
+            onChange={(v) => update({ softCostsPSF: v ?? 0 })}
+            format="currency"
+          />
+        </Stack>
+        <Stack
+          label="Discount (%)"
+          help="Annual discount rate for present-value calc. Compounded monthly in the discounted-NER formula."
+        >
           <FormattedNumberInput
             value={globals.discountRate}
             onChange={(v) => update({ discountRate: v ?? 0 })}
@@ -258,10 +339,21 @@ function DealAssumptions() {
   );
 }
 
-function Stack({ label, children }: { label: string; children: React.ReactNode }) {
+function Stack({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-1">
-      <Label className="text-[11px] text-[var(--color-muted-foreground)]">{label}</Label>
+      <Label className="flex items-center gap-1 text-[11px] text-[var(--color-muted-foreground)]">
+        <span>{label}</span>
+        {help && <HelpTooltip>{help}</HelpTooltip>}
+      </Label>
       {children}
     </div>
   );

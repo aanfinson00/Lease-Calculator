@@ -19,8 +19,15 @@ export type LCCalculation = "tiered" | "flat";
 export interface Globals {
   /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
   discountRate: number;
-  /** Building shell cost PSF, $ — replaces the Excel hardcoded $140. */
+  /** Land cost PSF, $. Part of total project basis. */
+  landCostPSF: number;
+  /** Building shell cost PSF, $ — bare-shell construction. */
   shellCostPSF: number;
+  /**
+   * Soft costs PSF, $. A&E, permits, financing, contingency, etc. — anything
+   * that's part of project basis but not shell, TI, LC, or land.
+   */
+  softCostsPSF: number;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
 }
@@ -143,8 +150,11 @@ export interface ScenarioResults {
   /** Avg rate over term ÷ building cost PSF, decimal. */
   yocTerm: number;
 
-  /** shellCostPSF + tiAllowancePSF + lcPSF, $. */
-  buildingCostPSF: number;
+  /**
+   * Total project basis PSF, $: land + shell + soft costs + TI + LC.
+   * Denominator for Yield on Cost.
+   */
+  totalBasisPSF: number;
 
   /** PSF — feeds the waterfall. */
   waterfall: WaterfallComponents;

@@ -63,7 +63,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       b: bResults.yocYr1,
       format: "percent",
       glossary:
-        "Year-1 base rent divided by total project basis. Cash-on-cost return at lease commencement.",
+        "Year-1 base rent divided by total project basis (land + shell + soft costs + TI + LC). Cash-on-cost return at lease commencement.",
     },
     {
       label: "Yield on Cost · Term",
@@ -71,16 +71,16 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       b: bResults.yocTerm,
       format: "percent",
       glossary:
-        "Average annual rent over the lease term divided by total project basis. Levelized return across the term.",
+        "Average annual rent over the lease term divided by total project basis (land + shell + soft costs + TI + LC). Levelized return across the term.",
     },
     {
       label: "Total Basis",
       unit: "$/SF",
-      a: aResults.buildingCostPSF,
-      b: bResults.buildingCostPSF,
+      a: aResults.totalBasisPSF,
+      b: bResults.totalBasisPSF,
       format: "currency",
       glossary:
-        "All-in landlord cost per SF — shell construction, TI allowance, leasing commissions, and the value of free rent given.",
+        "All-in project cost per SF: land + shell construction + soft costs (A&E, permits, financing) + TI allowance + leasing commissions. Free rent isn't a separate component — it lowers the LC base by reducing paying months.",
     },
   ];
 

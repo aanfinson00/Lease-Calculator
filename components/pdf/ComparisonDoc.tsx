@@ -220,10 +220,10 @@ export function ComparisonDoc({
     },
     {
       label: "Total Basis ($/SF)",
-      a: aResults.buildingCostPSF,
-      b: bResults.buildingCostPSF,
+      a: aResults.totalBasisPSF,
+      b: bResults.totalBasisPSF,
       fmt: (v: number) => fmtPSF(v, 2),
-      delta: bResults.buildingCostPSF - aResults.buildingCostPSF,
+      delta: bResults.totalBasisPSF - aResults.totalBasisPSF,
     },
   ];
 

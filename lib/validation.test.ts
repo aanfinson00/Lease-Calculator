@@ -45,6 +45,25 @@ describe("validateScenario — hard semantic warns", () => {
     expect(warnings[0]).toMatchObject({ field: "leaseExecutionDate", severity: "warn" });
   });
 
+  it("flags an empty execution date", () => {
+    const warnings = validateScenario({ ...baseline, leaseExecutionDate: "" });
+    expect(warnings.find((w) => w.field === "leaseExecutionDate")).toMatchObject({
+      severity: "warn",
+    });
+  });
+
+  it("flags an empty commencement date", () => {
+    const warnings = validateScenario({ ...baseline, leaseCommencement: "" });
+    expect(warnings.find((w) => w.field === "leaseCommencement")).toMatchObject({
+      severity: "warn",
+    });
+  });
+
+  it("flags an invalid (non-ISO) execution date", () => {
+    const warnings = validateScenario({ ...baseline, leaseExecutionDate: "not-a-date" });
+    expect(warnings.find((w) => w.field === "leaseExecutionDate")).toBeDefined();
+  });
+
   it("flags zero base rate", () => {
     const warnings = validateScenario({ ...baseline, baseRatePSF: 0 });
     expect(warnings.find((w) => w.field === "baseRatePSF")).toBeDefined();

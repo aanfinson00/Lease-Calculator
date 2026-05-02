@@ -13,7 +13,9 @@ import type { Globals, ScenarioInputs } from "./types";
 
 const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   discountRate: 0.08,
+  landCostPSF: 0,
   shellCostPSF: 140,
+  softCostsPSF: 0,
   horizonMonths: 204,
   ...overrides,
 });
@@ -133,7 +135,7 @@ describe("buildAnnualSchedule", () => {
   });
 
   it("YoC Yr1 reflects a year-1 override (regression)", () => {
-    // Without override, YoC Yr1 = baseRate / buildingCostPSF
+    // Without override, YoC Yr1 = baseRate / totalBasisPSF
     const baseline = runScenario(proposalInputs, makeGlobals());
     // Override yr 1 to a different rate; YoC Yr1 should track the override,
     // not the unchanged inputs.baseRatePSF.
@@ -145,7 +147,7 @@ describe("buildAnnualSchedule", () => {
     // numerator = 12.0 (override); denominator differs only because LC
     // shifts slightly when yr-1 contracted rent rises, so just sanity-check
     // the override numerator dominates.
-    expect(overridden.yocYr1).toBeCloseTo(12.0 / overridden.buildingCostPSF, 6);
+    expect(overridden.yocYr1).toBeCloseTo(12.0 / overridden.totalBasisPSF, 6);
   });
 });
 
@@ -257,15 +259,15 @@ describe("runScenario — Proposal (spec §12)", () => {
   const r = runScenario(proposalInputs, makeGlobals());
 
   it("building cost PSF ≈ $156.57 (140 shell + 10 TI + ~$6.57 LC, paying-month tier)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(156.57, 1);
+    expect(r.totalBasisPSF).toBeCloseTo(156.57, 1);
   });
 
-  it("YoC Yr1 = 8 / buildingCostPSF", () => {
-    expect(r.yocYr1).toBeCloseTo(8 / r.buildingCostPSF, 6);
+  it("YoC Yr1 = 8 / totalBasisPSF", () => {
+    expect(r.yocYr1).toBeCloseTo(8 / r.totalBasisPSF, 6);
   });
 
-  it("YoC Term = avgRate / buildingCostPSF", () => {
-    expect(r.yocTerm).toBeCloseTo(r.totals.avgRatePSF / r.buildingCostPSF, 6);
+  it("YoC Term = avgRate / totalBasisPSF", () => {
+    expect(r.yocTerm).toBeCloseTo(r.totals.avgRatePSF / r.totalBasisPSF, 6);
   });
 
   it("undiscounted NER ≈ $7.51 (paying-month-tier LC, 6 mo free at front)", () => {
@@ -360,7 +362,7 @@ describe("runScenario — UW (spec §12)", () => {
   const r = runScenario(uwInputs, makeGlobals());
 
   it("building cost PSF ≈ $150.37 (140 + 5 + ~$5.37 LC, paying-month tier)", () => {
-    expect(r.buildingCostPSF).toBeCloseTo(150.37, 1);
+    expect(r.totalBasisPSF).toBeCloseTo(150.37, 1);
   });
 
   it("YoC Yr1 ≈ 7 / 150.37 ≈ 4.66%", () => {

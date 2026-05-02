@@ -343,15 +343,20 @@ export function runScenario(
   const undiscountedNER = calcUndiscountedNER(grid, span, term);
   const discountedNER = calcDiscountedNER(grid, globals.discountRate, span, term);
 
-  const buildingCostPSF = globals.shellCostPSF + inputs.tiAllowancePSF + lcPSF;
+  const totalBasisPSF =
+    globals.landCostPSF +
+    globals.shellCostPSF +
+    globals.softCostsPSF +
+    inputs.tiAllowancePSF +
+    lcPSF;
   const avgRatePSF = calcAvgRatePSF(schedule, term);
 
   // YoC Yr1 should reflect any per-year override on year 1, so pull the
   // rate from the schedule (which incorporates rentScheduleOverride[0])
   // rather than `inputs.baseRatePSF` (the formula seed).
   const yr1Rate = schedule.find((r) => r.year === 1)?.annualRatePSF ?? inputs.baseRatePSF;
-  const yocYr1 = buildingCostPSF > 0 ? yr1Rate / buildingCostPSF : 0;
-  const yocTerm = buildingCostPSF > 0 ? avgRatePSF / buildingCostPSF : 0;
+  const yocYr1 = totalBasisPSF > 0 ? yr1Rate / totalBasisPSF : 0;
+  const yocTerm = totalBasisPSF > 0 ? avgRatePSF / totalBasisPSF : 0;
 
   const baseRent = sumColumn(grid, span, "baseRentPSF");
   const freeRent = sumColumn(grid, span, "freeRentPSF"); // negative
@@ -368,7 +373,7 @@ export function runScenario(
     discountedNER,
     yocYr1,
     yocTerm,
-    buildingCostPSF,
+    totalBasisPSF,
     waterfall,
     totals: {
       lcPSF,

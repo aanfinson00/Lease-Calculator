@@ -52,7 +52,7 @@ export function AnnualSchedule({ aName, aResults, bName, bResults }: Props) {
                   return (
                     <tr key={i} className="border-b last:border-b-0">
                       <td className="py-1.5 pr-4">
-                        {(aRow ?? bRow)?.year === 0 ? "Free Rent" : `Year ${(aRow ?? bRow)?.year}`}
+                        Year {(aRow ?? bRow)?.year}
                       </td>
                       <td className="py-1.5 pr-4 text-right">
                         {aRow ? fmtCurrency(aRow.annualRatePSF, 2) : "—"}

@@ -29,7 +29,9 @@ import type { FreeVariable, NERKind } from "./solver";
 
 const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
+  landCostPSF: 0,
   shellCostPSF: 140,
+  softCostsPSF: 0,
   horizonMonths: 204,
 };
 
@@ -245,7 +247,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 12,
+      version: 13,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -276,6 +278,11 @@ export const useAppStore = create<AppStore>()(
       //            different calc methods and payment timings.
       // v11 → v12: drop scenarios.freeRentStartMonth (mid-term abatement
       //            removed; free rent is always front-loaded now).
+      // v12 → v13: globals gain landCostPSF + softCostsPSF (default 0). Used
+      //            in the new totalBasisPSF formula (land + shell + soft +
+      //            TI + LC). Old persisted state defaulted to building-only
+      //            basis; with both new fields at 0, headline numbers are
+      //            preserved exactly until the user fills them in.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -377,6 +384,11 @@ export const useAppStore = create<AppStore>()(
             void _f;
             return { ...sc, inputs: rest };
           });
+        }
+        if (state && version < 13 && state.globals) {
+          const g = state.globals as unknown as Record<string, unknown>;
+          if (typeof g.landCostPSF !== "number") g.landCostPSF = 0;
+          if (typeof g.softCostsPSF !== "number") g.softCostsPSF = 0;
         }
         return state as unknown as PersistedState;
       },
