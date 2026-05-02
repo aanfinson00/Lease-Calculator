@@ -315,33 +315,62 @@ export function ComparisonDoc({
           </View>
         </View>
 
-        {/* Stats on the left, NER waterfalls stacked vertically on the right */}
+        {/* Headline metrics — full-width table (title kept verbatim per request) */}
         <Text style={styles.sectionTitle}>Headline metrics & NER waterfall (PSF over term)</Text>
+        <View style={styles.table}>
+          <View style={styles.rowHeader}>
+            <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
+            <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
+            <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
+            <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
+          </View>
+          {headlineRows.map((r) => {
+            const delta = r.b - r.a;
+            return (
+              <View key={r.label} style={styles.row}>
+                <Text style={styles.cellLabel}>{r.label}</Text>
+                <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
+                <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
+                <Text
+                  style={[
+                    styles.cellNum,
+                    delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
+                  ]}
+                >
+                  {fmtPctChange(r.a, r.b)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Deal assumptions on the left, NER waterfalls stacked on the right */}
+        <Text style={styles.sectionTitle}>Deal assumptions</Text>
         <View style={styles.twoCol}>
-          {/* LEFT — headline metrics table */}
+          {/* LEFT — assumptions table */}
           <View style={{ flex: 1 }}>
             <View style={styles.table}>
               <View style={styles.rowHeader}>
-                <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
+                <Text style={[styles.cellLabel, styles.bold]}>Assumption</Text>
                 <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
                 <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-                <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
               </View>
-              {headlineRows.map((r) => {
-                const delta = r.b - r.a;
+              {assumptionRows.map((r, i) => {
+                const differs = r.a !== r.b;
                 return (
-                  <View key={r.label} style={styles.row}>
-                    <Text style={styles.cellLabel}>{r.label}</Text>
-                    <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
-                    <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
-                    <Text
-                      style={[
-                        styles.cellNum,
-                        delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
-                      ]}
-                    >
-                      {fmtPctChange(r.a, r.b)}
-                    </Text>
+                  <View key={`${i}-${r.label}`}>
+                    {r.section && (
+                      <View style={styles.rowSubheader}>
+                        <Text style={[styles.cellLabel, styles.bold, styles.sectionLabel]}>
+                          {r.section}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.row} wrap={false}>
+                      <Text style={styles.cellLabel}>{r.label}</Text>
+                      <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.a}</Text>
+                      <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.b}</Text>
+                    </View>
                   </View>
                 );
               })}
@@ -353,35 +382,6 @@ export function ComparisonDoc({
             <PdfWaterfall title={aName} waterfall={aResults.waterfall} />
             <PdfWaterfall title={bName} waterfall={bResults.waterfall} />
           </View>
-        </View>
-
-        {/* Deal assumptions — every input that drives the calc, side by side */}
-        <Text style={styles.sectionTitle}>Deal assumptions</Text>
-        <View style={styles.table}>
-          <View style={styles.rowHeader}>
-            <Text style={[styles.cellLabel, styles.bold]}>Assumption</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-          </View>
-          {assumptionRows.map((r, i) => {
-            const differs = r.a !== r.b;
-            return (
-              <View key={`${i}-${r.label}`}>
-                {r.section && (
-                  <View style={styles.rowSubheader}>
-                    <Text style={[styles.cellLabel, styles.bold, styles.sectionLabel]}>
-                      {r.section}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.row} wrap={false}>
-                  <Text style={styles.cellLabel}>{r.label}</Text>
-                  <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.a}</Text>
-                  <Text style={[styles.cellNum, differs ? styles.bold : styles.cellMuted]}>{r.b}</Text>
-                </View>
-              </View>
-            );
-          })}
         </View>
 
         {/* Footer */}
