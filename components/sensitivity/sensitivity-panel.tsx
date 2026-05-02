@@ -12,6 +12,7 @@ import { fmtPSF, fmtPercent } from "@/lib/format";
 import { useAppStore } from "@/lib/store";
 import { defaultBounds, solveFor, type FreeVariable, type NERKind } from "@/lib/solver";
 import { cn } from "@/lib/utils";
+import { TornadoChart } from "./tornado-chart";
 
 const FREE_VARS: { value: FreeVariable; label: string }[] = [
   { value: "baseRatePSF", label: "Base Rate" },
@@ -306,6 +307,12 @@ export function SensitivityPanel() {
             held={isHolding && holdNer!.nerKind === "discounted"}
           />
         </div>
+
+        <TornadoChart
+          inputs={active.inputs}
+          globals={globals}
+          scenarioName={active.inputs.name}
+        />
       </CardContent>
     </Card>
   );

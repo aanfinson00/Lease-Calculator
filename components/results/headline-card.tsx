@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpTooltip } from "@/components/ui/help-tooltip";
 import {
   fmtCurrency,
   fmtPercent,
@@ -26,6 +27,8 @@ interface MetricDef {
   a: number;
   b: number;
   format: Format;
+  /** Plain-language definition shown in the tile's help tooltip. */
+  glossary: string;
 }
 
 /**
@@ -42,6 +45,8 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.discountedNER,
       b: bResults.discountedNER,
       format: "currency",
+      glossary:
+        "Net Effective Rent on a present-value basis. Sum of discounted base rent over the term, less the present value of landlord costs (LC, TI, free rent), spread across the lease SF and term in years. Reflects time value of money.",
     },
     {
       label: "Undiscounted NER",
@@ -49,18 +54,24 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.undiscountedNER,
       b: bResults.undiscountedNER,
       format: "currency",
+      glossary:
+        "Same calculation as Discounted NER but with no discount rate applied. The average rent the landlord effectively earns per SF per year over the term, net of all concessions.",
     },
     {
       label: "Yield on Cost · Yr 1",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       format: "percent",
+      glossary:
+        "Year-1 base rent divided by total project basis. Cash-on-cost return at lease commencement.",
     },
     {
       label: "Yield on Cost · Term",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       format: "percent",
+      glossary:
+        "Average annual rent over the lease term divided by total project basis. Levelized return across the term.",
     },
     {
       label: "Total Basis",
@@ -68,6 +79,8 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.buildingCostPSF,
       b: bResults.buildingCostPSF,
       format: "currency",
+      glossary:
+        "All-in landlord cost per SF — shell construction, TI allowance, leasing commissions, and the value of free rent given.",
     },
   ];
 
@@ -104,7 +117,10 @@ function Tile({ metric, aName, bName }: TileProps) {
   return (
     <div className="flex flex-col gap-1 rounded-md border bg-[var(--color-card)] p-2.5">
       <div className="flex items-baseline justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-        <span className="truncate">{metric.label}</span>
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="truncate">{metric.label}</span>
+          <HelpTooltip>{metric.glossary}</HelpTooltip>
+        </span>
         {metric.unit && <span className="text-[var(--color-muted-foreground)]/70">{metric.unit}</span>}
       </div>
 

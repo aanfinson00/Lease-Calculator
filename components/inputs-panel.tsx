@@ -283,6 +283,16 @@ function Section({ section, scenarios, warningsByScenario }: SectionProps) {
   const cols = section.fields.length;
   const gridStyle = { gridTemplateColumns: `7.5rem repeat(${cols}, minmax(0, 1fr))` };
 
+  // Diff map: which fields hold different values across scenarios. Used to
+  // accent cells visually so the user can see at a glance what's not the
+  // same between A and B. Skip derived/compute cells (no `field`).
+  const differsByField = new Map<keyof ScenarioInputs, boolean>();
+  for (const f of section.fields) {
+    if (!f.field) continue;
+    const values = scenarios.map((sc) => String(sc.inputs[f.field!] ?? ""));
+    differsByField.set(f.field, new Set(values).size > 1);
+  }
+
   return (
     <div className="flex flex-col gap-1.5 py-3 last:pb-0">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
@@ -318,6 +328,7 @@ function Section({ section, scenarios, warningsByScenario }: SectionProps) {
                 scenarioId={sc.id}
                 inputs={sc.inputs}
                 warning={f.field ? scenarioWarnings.find((w) => w.field === f.field) : undefined}
+                differs={f.field ? differsByField.get(f.field) === true : false}
               />
             ))}
           </div>
@@ -336,9 +347,10 @@ interface CellProps {
   scenarioId: string;
   inputs: ScenarioInputs;
   warning?: Warning;
+  differs?: boolean;
 }
 
-function Cell({ field, scenarioId, inputs, warning }: CellProps) {
+function Cell({ field, scenarioId, inputs, warning, differs }: CellProps) {
   const updateInput = useAppStore((s) => s.updateInput);
 
   // Derived/read-only cell — computed from current inputs, can't be edited.
@@ -364,17 +376,19 @@ function Cell({ field, scenarioId, inputs, warning }: CellProps) {
     const key = field.field;
     const current = String(inputs[key] ?? "");
     return (
-      <RadioGroup
-        value={current}
-        onValueChange={(v) => updateInput(scenarioId, key, v as never)}
-        className="flex h-8 items-center gap-3"
-      >
-        {field.radio.map((opt) => (
-          <label key={opt.value} className="flex items-center gap-1 text-xs">
-            <RadioGroupItem value={opt.value} /> {opt.label}
-          </label>
-        ))}
-      </RadioGroup>
+      <CellWrapper differs={differs}>
+        <RadioGroup
+          value={current}
+          onValueChange={(v) => updateInput(scenarioId, key, v as never)}
+          className="flex h-8 items-center gap-3"
+        >
+          {field.radio.map((opt) => (
+            <label key={opt.value} className="flex items-center gap-1 text-xs">
+              <RadioGroupItem value={opt.value} /> {opt.label}
+            </label>
+          ))}
+        </RadioGroup>
+      </CellWrapper>
     );
   }
 
@@ -384,7 +398,7 @@ function Cell({ field, scenarioId, inputs, warning }: CellProps) {
   // Date field — plain text input, no formatting.
   if (field.type === "date") {
     return (
-      <CellWrapper warning={warning}>
+      <CellWrapper warning={warning} differs={differs}>
         <Input
           type="date"
           value={String(inputs[key] ?? "")}
@@ -398,7 +412,7 @@ function Cell({ field, scenarioId, inputs, warning }: CellProps) {
   // Numeric input with focus-aware formatting.
   const raw = inputs[key];
   return (
-    <CellWrapper warning={warning}>
+    <CellWrapper warning={warning} differs={differs}>
       <FormattedNumberInput
         value={typeof raw === "number" ? raw : undefined}
         onChange={(v) => updateInput(scenarioId, key, (v as unknown) as never)}
@@ -412,22 +426,33 @@ function Cell({ field, scenarioId, inputs, warning }: CellProps) {
 }
 
 /**
- * Wraps an input with a small `!` indicator when the field has a warning.
- * The icon hovers (focus too) to reveal the message via HelpTooltip.
+ * Wraps an input with optional treatments: a `!` indicator when the field
+ * has a warning, and a left-border accent when this field's value differs
+ * across the compared scenarios.
  */
 function CellWrapper({
   warning,
+  differs,
   children,
 }: {
-  warning: Warning | undefined;
+  warning?: Warning;
+  differs?: boolean;
   children: React.ReactNode;
 }) {
-  if (!warning) return <>{children}</>;
+  const accent = differs
+    ? "border-l-2 border-[var(--color-primary)] pl-1"
+    : undefined;
+
+  if (!warning) {
+    if (!accent) return <>{children}</>;
+    return <div className={cn("flex items-center", accent)}>{children}</div>;
+  }
+
   const isWarn = warning.severity === "warn";
   const Icon = isWarn ? TriangleAlert : Info;
   const colorClass = isWarn ? "text-[var(--color-cost)]" : "text-[var(--color-muted-foreground)]";
   return (
-    <div className="flex items-center gap-1">
+    <div className={cn("flex items-center gap-1", accent)}>
       <div className="flex-1">{children}</div>
       <span className="group/help relative inline-flex items-center">
         <button
