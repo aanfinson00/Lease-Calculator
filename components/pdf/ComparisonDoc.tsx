@@ -106,28 +106,37 @@ interface WaterfallProps {
   waterfall: WaterfallComponents;
 }
 
+// Hex equivalents of the on-screen oklch theme tokens (light mode):
+//   --color-primary  oklch(0.42 0.10 245) → #0b517f
+//   --color-cost     oklch(0.55 0.15 35)  → #b8492e
+//   --color-success  oklch(0.50 0.12 155) → #0b7643
+// Hard-coded because react-pdf can't read CSS custom properties.
+const PDF_PRIMARY = "#0b517f";
+const PDF_COST = "#b8492e";
+const PDF_SUCCESS = "#0b7643";
+
 function PdfWaterfall({ title, waterfall }: WaterfallProps) {
   const items = [
-    { name: "Base", base: 0, value: waterfall.baseRent, color: "#1e293b" },
+    { name: "Base", base: 0, value: waterfall.baseRent, color: PDF_PRIMARY },
     {
       name: "Free",
       base: waterfall.baseRent + waterfall.freeRent,
       value: -waterfall.freeRent,
-      color: "#dc2626",
+      color: PDF_COST,
     },
     {
       name: "TI",
       base: waterfall.baseRent + waterfall.freeRent + waterfall.ti,
       value: -waterfall.ti,
-      color: "#dc2626",
+      color: PDF_COST,
     },
     {
       name: "LC",
       base: waterfall.baseRent + waterfall.freeRent + waterfall.ti + waterfall.lc,
       value: -waterfall.lc,
-      color: "#dc2626",
+      color: PDF_COST,
     },
-    { name: "Net CF", base: 0, value: waterfall.netCashFlow, color: "#059669" },
+    { name: "Net CF", base: 0, value: waterfall.netCashFlow, color: PDF_SUCCESS },
   ];
 
   // Chart geometry. Sized to fit a half-page column on LETTER (~248pt
@@ -195,18 +204,23 @@ interface DocProps {
 
 /**
  * Render `(b - a) / a` as a signed percent string, e.g. "+12.34%" or
- * "−4.10%". Returns "—" when A is zero (denominator) or either value
+ * "-4.10%". Returns "--" when A is zero (denominator) or either value
  * isn't finite.
+ *
+ * IMPORTANT: Uses ASCII hyphen (U+002D) and a double-hyphen no-data
+ * marker because @react-pdf/renderer's bundled Helvetica only carries
+ * Latin-1 glyphs. Anything outside that block (true minus U+2212,
+ * em dash U+2014, Greek delta U+0394) falls back to a tofu glyph.
  */
 const fmtPctChange = (a: number, b: number): string => {
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return "—";
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0) return "--";
   const pct = ((b - a) / Math.abs(a)) * 100;
-  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  const sign = pct > 0 ? "+" : pct < 0 ? "-" : "";
   return `${sign}${Math.abs(pct).toFixed(2)}%`;
 };
 
 const fmtDate = (iso: string | undefined): string => {
-  if (!iso) return "—";
+  if (!iso) return "--";
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return iso;
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -322,7 +336,7 @@ export function ComparisonDoc({
             <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
             <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
             <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>Δ %</Text>
+            <Text style={[styles.cellNum, styles.bold]}>Chg %</Text>
           </View>
           {headlineRows.map((r) => {
             const delta = r.b - r.a;

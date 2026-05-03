@@ -594,7 +594,14 @@ function CellWrapper({
         : diffStatus === "neutral"
           ? "border-[var(--color-primary)]"
           : undefined;
-  const accent = accentColor ? cn("border-l-2 pl-1", accentColor) : undefined;
+  // Negative left margin pulls the bordered cell back into its column so
+  // the input's content (numbers etc.) stays in the same horizontal
+  // position whether or not a diff border is drawn. Without this, every
+  // diff'd cell would slide right by `border-width + padding`, breaking
+  // column alignment within the inputs grid.
+  const accent = accentColor
+    ? cn("-ml-[3px] border-l-2 pl-[1px]", accentColor)
+    : undefined;
 
   if (!warning) {
     if (!accent) return <>{children}</>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import {
@@ -27,6 +28,8 @@ interface MetricDef {
   a: number;
   b: number;
   format: Format;
+  /** Direction that's "better for the landlord" — drives delta color. */
+  betterIs: "higher" | "lower";
   /** Plain-language definition shown in the tile's help tooltip. */
   glossary: string;
 }
@@ -45,6 +48,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.discountedNER,
       b: bResults.discountedNER,
       format: "currency",
+      betterIs: "higher",
       glossary:
         "Net Effective Rent on a present-value basis. Sum of discounted base rent over the term, less the present value of landlord costs (LC, TI, free rent), spread across the lease SF and term in years. Reflects time value of money.",
     },
@@ -54,6 +58,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.undiscountedNER,
       b: bResults.undiscountedNER,
       format: "currency",
+      betterIs: "higher",
       glossary:
         "Same calculation as Discounted NER but with no discount rate applied. The average rent the landlord effectively earns per SF per year over the term, net of all concessions.",
     },
@@ -62,6 +67,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       format: "percent",
+      betterIs: "higher",
       glossary:
         "Year-1 base rent divided by total project basis (land + shell + soft costs + TI + LC). Cash-on-cost return at lease commencement.",
     },
@@ -70,6 +76,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       format: "percent",
+      betterIs: "higher",
       glossary:
         "Average annual rent over the lease term divided by total project basis (land + shell + soft costs + TI + LC). Levelized return across the term.",
     },
@@ -79,6 +86,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       a: aResults.totalBasisPSF,
       b: bResults.totalBasisPSF,
       format: "currency",
+      betterIs: "lower",
       glossary:
         "All-in project cost per SF: land + shell construction + soft costs (A&E, permits, financing) + TI allowance + leasing commissions. Free rent isn't a separate component — it lowers the LC base by reducing paying months.",
     },
@@ -90,7 +98,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
         <CardTitle>Headline Metrics · {bName} vs {aName}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 divide-y divide-[var(--color-border)] sm:grid-cols-3 sm:divide-y-0 sm:divide-x lg:grid-cols-5">
           {metrics.map((m) => (
             <Tile key={m.label} metric={m} aName={aName} bName={bName} />
           ))}
@@ -111,11 +119,16 @@ function Tile({ metric, aName, bName }: TileProps) {
   const fmtSigned =
     metric.format === "percent" ? fmtSignedPercent : fmtSignedCurrency;
   const delta = metric.b - metric.a;
-  const isGain = delta > 0;
-  const isLoss = delta < 0;
+  // "Better" depends on the metric — higher rent is good, lower basis is good.
+  const isBetter =
+    delta !== 0 &&
+    ((metric.betterIs === "higher" && delta > 0) ||
+      (metric.betterIs === "lower" && delta < 0));
+  const isWorse = delta !== 0 && !isBetter;
+  const DirectionIcon = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : null;
 
   return (
-    <div className="flex flex-col gap-1 rounded-md border bg-[var(--color-card)] p-2.5">
+    <div className="flex flex-col gap-1 px-3 py-2 first:pl-0 last:pr-0">
       <div className="flex items-baseline justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
         <span className="flex min-w-0 items-center gap-1">
           <span className="truncate">{metric.label}</span>
@@ -128,12 +141,13 @@ function Tile({ metric, aName, bName }: TileProps) {
         <span className="text-lg font-semibold tabular-nums">{fmt(metric.b)}</span>
         <span
           className={cn(
-            "text-xs tabular-nums",
-            isGain && "text-[var(--color-success)]",
-            isLoss && "text-[var(--color-destructive)]",
-            !isGain && !isLoss && "text-[var(--color-muted-foreground)]",
+            "inline-flex items-center gap-0.5 text-xs tabular-nums",
+            isBetter && "text-[var(--color-success)]",
+            isWorse && "text-[var(--color-destructive)]",
+            !isBetter && !isWorse && "text-[var(--color-muted-foreground)]",
           )}
         >
+          {DirectionIcon && <DirectionIcon className="size-3" aria-hidden />}
           {fmtSigned(delta)}
         </span>
       </div>
