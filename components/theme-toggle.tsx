@@ -51,7 +51,7 @@ export function ThemeToggle() {
       onClick={cycle}
       title={title}
       aria-label={title}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md border bg-[var(--color-background)] text-[var(--color-foreground)] transition-colors hover:bg-[var(--color-accent)] [&_svg]:size-4"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-foreground)] transition-colors hover:bg-[var(--color-accent)] [&_svg]:size-4"
     >
       <Icon />
     </button>

@@ -85,11 +85,12 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
           {" · all values $/SF"}
         </span>
       </div>
-      <div className="overflow-x-auto rounded-md border">
-        <table className="text-xs tabular-nums">
+      <div className="relative">
+        <div className="overflow-x-auto rounded-md border">
+          <table className="text-xs tabular-nums">
           <thead className="bg-[var(--color-muted)]">
             <tr>
-              <th className="sticky left-0 z-10 w-[140px] min-w-[140px] border-r bg-[var(--color-muted)] px-2 py-1.5 text-left font-semibold">
+              <th className="sticky left-0 z-10 w-[140px] min-w-[140px] border-r bg-[var(--color-muted)] px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
                 Month
               </th>
               {rows.map((r, i) => {
@@ -126,7 +127,7 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
                   </th>
                 );
               })}
-              <th className="sticky right-0 z-10 min-w-[100px] border-l bg-[var(--color-muted)] px-2 py-1.5 text-right font-semibold">
+              <th className="sticky right-0 z-10 min-w-[100px] border-l bg-[var(--color-muted)] px-2 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
                 Total
               </th>
             </tr>
@@ -183,7 +184,15 @@ function ScheduleTable({ name, inputs, results }: ScenarioPair) {
               emphasized
             />
           </tbody>
-        </table>
+          </table>
+        </div>
+        {/* Right-edge fade hints there's more table to scroll to. The */}
+        {/* gradient sits inside the relative wrapper, above the scroll */}
+        {/* container, and is pointer-events-none so it doesn't block scroll. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-md bg-gradient-to-l from-[var(--color-card)] to-transparent"
+        />
       </div>
     </div>
   );

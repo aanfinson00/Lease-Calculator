@@ -155,7 +155,7 @@ export function SensitivityPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>Sensitivity</CardTitle>
           <div className="flex items-center gap-2">
-            <Label className="text-xs text-[var(--color-muted-foreground)]">Sliding:</Label>
+            <Label className="text-xs text-[var(--color-muted-foreground)]">Adjust:</Label>
             <select
               value={activeId}
               onChange={(e) => setActiveId(e.target.value)}

@@ -47,7 +47,8 @@ export function ScenarioBar() {
               <Input
                 value={sc.inputs.name}
                 onChange={(e) => renameScenario(sc.id, e.target.value)}
-                className="h-7 w-32 border-0 bg-transparent px-1 font-medium shadow-none focus-visible:ring-0"
+                aria-label={`Scenario name: ${sc.inputs.name}`}
+                className="h-7 w-32 border-0 bg-transparent px-1 font-medium shadow-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60"
               />
               <div className="flex items-center gap-0.5">
                 <Button
@@ -55,6 +56,8 @@ export function ScenarioBar() {
                   variant={isA ? "default" : "ghost"}
                   className="h-7 px-2 text-xs font-semibold"
                   onClick={() => setComparisonA(sc.id)}
+                  aria-label={`Use ${sc.inputs.name} as Scenario A`}
+                  aria-pressed={isA}
                 >
                   A
                 </Button>
@@ -63,6 +66,8 @@ export function ScenarioBar() {
                   variant={isB ? "default" : "ghost"}
                   className="h-7 px-2 text-xs font-semibold"
                   onClick={() => setComparisonB(sc.id)}
+                  aria-label={`Use ${sc.inputs.name} as Scenario B`}
+                  aria-pressed={isB}
                 >
                   B
                 </Button>
@@ -115,7 +120,7 @@ export function PropertyHeader() {
         value={propertyName}
         onChange={(e) => setPropertyName(e.target.value)}
         placeholder="Untitled property"
-        className="h-9 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-0"
+        className="h-9 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60"
       />
     </div>
   );

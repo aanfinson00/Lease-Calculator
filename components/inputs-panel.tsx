@@ -250,8 +250,13 @@ function WarningStrip({
   if (items.length === 0) return null;
   return (
     <div className="flex flex-col gap-1 py-3 last:pb-0">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-        Notices
+      <div className="flex flex-col gap-0.5">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+          Notices
+        </div>
+        <div className="text-[10px] text-[var(--color-muted-foreground)]/80">
+          Hover the ! icons in the cells above for details.
+        </div>
       </div>
       <ul className="flex flex-col gap-1">
         {items.map(({ scenarioName, w }, i) => (
@@ -265,9 +270,9 @@ function WarningStrip({
             )}
           >
             {w.severity === "warn" ? (
-              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             ) : (
-              <Info className="mt-0.5 size-3.5 shrink-0" />
+              <Info className="mt-0.5 size-4 shrink-0" />
             )}
             <span>
               <span className="font-medium">{scenarioName}:</span> {w.message}
@@ -620,11 +625,11 @@ function CellWrapper({
           tabIndex={0}
           aria-label={warning.message}
           className={cn(
-            "inline-flex size-3.5 items-center justify-center rounded-full focus:outline-none",
+            "inline-flex size-4 items-center justify-center rounded-full focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60",
             colorClass,
           )}
         >
-          <Icon className="size-3.5" />
+          <Icon className="size-4" />
         </button>
         <span
           role="tooltip"

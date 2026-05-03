@@ -37,7 +37,7 @@ export function AnnualSchedule({ aName, aResults, bName, bResults }: Props) {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm tabular-nums">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-[var(--color-muted-foreground)]">
+                <tr className="border-b text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
                   <th className="py-2 pr-4">Year</th>
                   <th className="py-2 pr-4 text-right">{aName} Rate</th>
                   <th className="py-2 pr-4 text-right">{aName} Months</th>

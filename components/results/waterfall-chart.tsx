@@ -107,7 +107,7 @@ export function WaterfallChart({ title, waterfall }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="grid grid-cols-5 gap-1 pt-2 text-xs tabular-nums text-[var(--color-muted-foreground)]">
+        <div className="mt-3 grid grid-cols-5 gap-1 border-t border-[var(--color-border)]/50 pt-3 text-xs tabular-nums text-[var(--color-muted-foreground)]">
           {data.map((d) => (
             <div key={d.name} className="text-center">
               <div className="font-medium">{d.name}</div>

@@ -179,7 +179,7 @@ export function DealPicker({
         <div
           ref={popoverRef}
           className={cn(
-            "absolute top-full z-30 mt-1 w-[420px] rounded-md border bg-[var(--color-card)] p-2 shadow-md",
+            "absolute top-full z-30 mt-1 w-[420px] rounded-md border border-[var(--color-border)] bg-[var(--color-card)] p-2 shadow-lg",
             align === "right" ? "right-0" : "left-0",
           )}
           role="dialog"
