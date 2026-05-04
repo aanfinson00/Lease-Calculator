@@ -29,9 +29,7 @@ import type { FreeVariable, NERKind } from "./solver";
 
 const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
-  landCostPSF: 0,
-  shellCostPSF: 140,
-  softCostsPSF: 0,
+  projectBasisPSF: 140,
   horizonMonths: 204,
 };
 
@@ -284,7 +282,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 14,
+      version: 15,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -329,6 +327,10 @@ export const useAppStore = create<AppStore>()(
       //            in dealAsScenarioPatch); legacy `commencement` renames
       //            to `commencementDate`; status string maps via
       //            mapLegacyStatus (LEASE -> EXECUTED, SPEC -> PROPOSAL).
+      // v14 → v15: collapse globals.{landCostPSF, shellCostPSF, softCostsPSF}
+      //            into a single projectBasisPSF (sum). Per user feedback
+      //            the three-way split was friction without payoff — most
+      //            asset managers carry one rolled-up basis number.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -483,6 +485,18 @@ export const useAppStore = create<AppStore>()(
               modifiedAt: now,
             };
           });
+        }
+        if (state && version < 15 && state.globals) {
+          const g = state.globals as unknown as Record<string, unknown>;
+          if (typeof g.projectBasisPSF !== "number") {
+            const land = typeof g.landCostPSF === "number" ? g.landCostPSF : 0;
+            const shell = typeof g.shellCostPSF === "number" ? g.shellCostPSF : 0;
+            const soft = typeof g.softCostsPSF === "number" ? g.softCostsPSF : 0;
+            g.projectBasisPSF = land + shell + soft;
+          }
+          delete g.landCostPSF;
+          delete g.shellCostPSF;
+          delete g.softCostsPSF;
         }
         return state as unknown as PersistedState;
       },

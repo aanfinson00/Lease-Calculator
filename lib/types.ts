@@ -19,15 +19,13 @@ export type LCCalculation = "tiered" | "flat";
 export interface Globals {
   /** Annual discount rate, decimal (0.08 = 8%). Compounded monthly in PV. */
   discountRate: number;
-  /** Land cost PSF, $. Part of total project basis. */
-  landCostPSF: number;
-  /** Building shell cost PSF, $ — bare-shell construction. */
-  shellCostPSF: number;
   /**
-   * Soft costs PSF, $. A&E, permits, financing, contingency, etc. — anything
-   * that's part of project basis but not shell, TI, LC, or land.
+   * Current project basis PSF, $ — what you're already in for on this
+   * asset before the new deal's TI/LC. Whatever combination of land,
+   * shell, and soft costs you carry; entered as one number rather than
+   * split. The headline Total Basis adds the scenario's TI + LC on top.
    */
-  softCostsPSF: number;
+  projectBasisPSF: number;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
 }

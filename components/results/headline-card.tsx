@@ -69,7 +69,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       format: "percent",
       betterIs: "higher",
       glossary:
-        "Year-1 base rent divided by total project basis (land + shell + soft costs + TI + LC). Cash-on-cost return at lease commencement.",
+        "Year-1 base rent divided by total project basis (current basis + this scenario's TI + LC). Cash-on-cost return at lease commencement.",
     },
     {
       label: "Yield on Cost · Term",
@@ -78,7 +78,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       format: "percent",
       betterIs: "higher",
       glossary:
-        "Average annual rent over the lease term divided by total project basis (land + shell + soft costs + TI + LC). Levelized return across the term.",
+        "Average annual rent over the lease term divided by total project basis (current basis + this scenario's TI + LC). Levelized return across the term.",
     },
     {
       label: "Total Basis",
@@ -88,7 +88,7 @@ export function HeadlineCard({ aName, aResults, bName, bResults }: Props) {
       format: "currency",
       betterIs: "lower",
       glossary:
-        "All-in project cost per SF: land + shell construction + soft costs (A&E, permits, financing) + TI allowance + leasing commissions. Free rent isn't a separate component — it lowers the LC base by reducing paying months.",
+        "All-in project cost per SF: your current project basis (entered in the shared assumptions) + this scenario's TI allowance + leasing commissions. Free rent isn't a separate component — it lowers the LC base by reducing paying months.",
     },
   ];
 

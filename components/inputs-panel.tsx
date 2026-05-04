@@ -298,34 +298,14 @@ function DealAssumptions() {
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
         Deal Assumptions · shared
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         <Stack
-          label="Land ($/SF)"
-          help="Land cost per SF. Part of total project basis (denominator for Yield on Cost)."
+          label="Current Basis ($/SF)"
+          help="Your current project basis per SF before this deal's TI and LC. Whatever combination of land, shell, and soft costs you carry — entered as one rolled-up number. The headline Total Basis adds the scenario's TI + LC on top."
         >
           <FormattedNumberInput
-            value={globals.landCostPSF}
-            onChange={(v) => update({ landCostPSF: v ?? 0 })}
-            format="currency"
-          />
-        </Stack>
-        <Stack
-          label="Shell ($/SF)"
-          help="Bare-shell construction cost per SF. Part of total project basis (denominator for Yield on Cost)."
-        >
-          <FormattedNumberInput
-            value={globals.shellCostPSF}
-            onChange={(v) => update({ shellCostPSF: v ?? 0 })}
-            format="currency"
-          />
-        </Stack>
-        <Stack
-          label="Soft Costs ($/SF)"
-          help="A&E, permits, financing, contingency, and other non-construction costs that are part of total project basis."
-        >
-          <FormattedNumberInput
-            value={globals.softCostsPSF}
-            onChange={(v) => update({ softCostsPSF: v ?? 0 })}
+            value={globals.projectBasisPSF}
+            onChange={(v) => update({ projectBasisPSF: v ?? 0 })}
             format="currency"
           />
         </Stack>

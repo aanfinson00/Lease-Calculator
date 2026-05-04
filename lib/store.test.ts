@@ -25,9 +25,7 @@ function resetStore() {
     property: { name: "" },
     globals: {
       discountRate: 0.08,
-      landCostPSF: 0,
-      shellCostPSF: 140,
-      softCostsPSF: 0,
+      projectBasisPSF: 140,
       horizonMonths: 204,
     },
     deals: [],
@@ -111,7 +109,7 @@ describe("useAppStore — input updates", () => {
     s.updateGlobals({ discountRate: 0.1 });
     const g = useAppStore.getState().globals;
     expect(g.discountRate).toBe(0.1);
-    expect(g.shellCostPSF).toBe(140); // unchanged
+    expect(g.projectBasisPSF).toBe(140); // unchanged
   });
 
   it("setPropertyName works", () => {

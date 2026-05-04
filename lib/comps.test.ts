@@ -411,9 +411,7 @@ describe("scenarioToComp", () => {
   };
   const globals: Globals = {
     discountRate: 0.08,
-    landCostPSF: 0,
-    shellCostPSF: 140,
-    softCostsPSF: 0,
+    projectBasisPSF: 140,
     horizonMonths: 204,
   };
 

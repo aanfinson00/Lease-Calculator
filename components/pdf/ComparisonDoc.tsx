@@ -299,9 +299,7 @@ export function ComparisonDoc({
     { label: "Execution date", a: fmtDate(aInputs.leaseExecutionDate), b: fmtDate(bInputs.leaseExecutionDate) },
     { label: "Commencement date", a: fmtDate(aInputs.leaseCommencement), b: fmtDate(bInputs.leaseCommencement) },
 
-    { section: "Shared assumptions", label: "Land ($/SF)", a: fmtCurrency(globals.landCostPSF, 2), b: fmtCurrency(globals.landCostPSF, 2) },
-    { label: "Shell ($/SF)", a: fmtCurrency(globals.shellCostPSF, 2), b: fmtCurrency(globals.shellCostPSF, 2) },
-    { label: "Soft Costs ($/SF)", a: fmtCurrency(globals.softCostsPSF, 2), b: fmtCurrency(globals.softCostsPSF, 2) },
+    { section: "Shared assumptions", label: "Current Basis ($/SF)", a: fmtCurrency(globals.projectBasisPSF, 2), b: fmtCurrency(globals.projectBasisPSF, 2) },
     { label: "Discount rate", a: fmtPercent(globals.discountRate * 100, 2), b: fmtPercent(globals.discountRate * 100, 2) },
     { label: "Total Basis ($/SF)", a: fmtCurrency(aResults.totalBasisPSF, 2), b: fmtCurrency(bResults.totalBasisPSF, 2) },
   ];

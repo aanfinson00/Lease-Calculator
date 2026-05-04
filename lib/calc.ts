@@ -343,12 +343,7 @@ export function runScenario(
   const undiscountedNER = calcUndiscountedNER(grid, span, term);
   const discountedNER = calcDiscountedNER(grid, globals.discountRate, span, term);
 
-  const totalBasisPSF =
-    globals.landCostPSF +
-    globals.shellCostPSF +
-    globals.softCostsPSF +
-    inputs.tiAllowancePSF +
-    lcPSF;
+  const totalBasisPSF = globals.projectBasisPSF + inputs.tiAllowancePSF + lcPSF;
   const avgRatePSF = calcAvgRatePSF(schedule, term);
 
   // YoC Yr1 should reflect any per-year override on year 1, so pull the
