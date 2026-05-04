@@ -1,22 +1,36 @@
 "use client";
 
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BookmarkPlus, Copy, Plus, Trash2 } from "lucide-react";
 import { DealPicker } from "@/components/deal-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { scenarioToComp } from "@/lib/comps";
 import { useAppStore } from "@/lib/store";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 export function ScenarioBar() {
+  const router = useRouter();
   const scenarios = useAppStore((s) => s.scenarios);
   const comparison = useAppStore((s) => s.comparison);
+  const globals = useAppStore((s) => s.globals);
   const addScenario = useAppStore((s) => s.addScenario);
   const renameScenario = useAppStore((s) => s.renameScenario);
   const duplicateScenario = useAppStore((s) => s.duplicateScenario);
   const deleteScenario = useAppStore((s) => s.deleteScenario);
   const setComparisonA = useAppStore((s) => s.setComparisonA);
   const setComparisonB = useAppStore((s) => s.setComparisonB);
+  const setCompDraft = useAppStore((s) => s.setCompDraft);
+
+  const saveAsComp = (scenarioId: string) => {
+    const sc = scenarios.find((s) => s.id === scenarioId);
+    if (!sc) return;
+    setCompDraft(scenarioToComp(sc.inputs, globals));
+    toast(`Drafting comp from "${sc.inputs.name}"`, "info");
+    router.push("/comps/new");
+  };
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -80,6 +94,16 @@ export function ScenarioBar() {
                   aria-label="Duplicate"
                 >
                   <Copy />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={() => saveAsComp(sc.id)}
+                  aria-label={`Save ${sc.inputs.name} as a comp`}
+                  title="Save as comp"
+                >
+                  <BookmarkPlus />
                 </Button>
                 <Button
                   size="icon"

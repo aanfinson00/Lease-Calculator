@@ -9,11 +9,13 @@ import {
   hasActiveFilters,
   parseComps,
   parseUSDate,
+  scenarioToComp,
   sortComps,
   summarizeComps,
   validateComp,
   type Comp,
 } from "./comps";
+import type { Globals, ScenarioInputs } from "./types";
 
 const HEADER =
   "Code,Deal Name,Tenant Name,Project SF,Building SF,Lease SF,Untrended Rent,Trended Rent,Annual Growth,Lease Term,Start Month Post Completion,Starting Month,Start Month (Date),Free Rent (months),TIs,LCs,LC Override,Rent Escalations,MLA,Status";
@@ -316,7 +318,27 @@ describe("summarizeComps", () => {
       avgTermMonths: 0,
       avgTIPSF: 0,
       avgCombinedLCPercent: 0,
+      nerSnapshotCount: 0,
     });
+  });
+
+  it("counts how many comps have a cached NER snapshot", () => {
+    const corpus: Comp[] = [
+      baseComp({ id: "1" }),
+      baseComp({ id: "2", ner: { undiscounted: 9, discounted: 8, totalBasisPSF: 150 } }),
+      baseComp({ id: "3", ner: { undiscounted: 11, discounted: 10, totalBasisPSF: 160 } }),
+    ];
+    const s = summarizeComps(corpus);
+    expect(s.nerSnapshotCount).toBe(2);
+    expect(s.avgDiscountedNER).toBe(9);
+    expect(s.avgUndiscountedNER).toBe(10);
+  });
+
+  it("leaves NER averages undefined when nothing has a snapshot", () => {
+    const s = summarizeComps([baseComp(), baseComp()]);
+    expect(s.nerSnapshotCount).toBe(0);
+    expect(s.avgDiscountedNER).toBeUndefined();
+    expect(s.avgUndiscountedNER).toBeUndefined();
   });
 
   it("averages numeric fields across the list", () => {
@@ -364,5 +386,72 @@ describe("compsToCsv / csvHeader / csvEscape", () => {
     const row = compsToCsv([c]).split("\n")[1]!;
     // Two consecutive commas signal an empty cell.
     expect(row).toMatch(/,,/);
+  });
+});
+
+describe("scenarioToComp", () => {
+  const inputs: ScenarioInputs = {
+    name: "Counter v1",
+    dealCode: "DEAL-X",
+    projectSF: 300_000,
+    buildingSF: 300_000,
+    proposedLeaseSF: 100_000,
+    baseRatePSF: 9.5,
+    escalation: 0.03,
+    lcLLRepPercent: 0.03,
+    lcTenantRepPercent: 0.06,
+    lcCalculation: "tiered",
+    lcStructure: "split50",
+    tiAllowancePSF: 7,
+    freeRentMonths: 4,
+    leaseTermMonths: 84,
+    leaseCommencement: "2026-06-01",
+    leaseExecutionDate: "2026-04-01",
+    tiDurationMonths: 1,
+  };
+  const globals: Globals = {
+    discountRate: 0.08,
+    landCostPSF: 0,
+    shellCostPSF: 140,
+    softCostsPSF: 0,
+    horizonMonths: 204,
+  };
+
+  it("copies the scenario's economics into the draft", () => {
+    const c = scenarioToComp(inputs, globals);
+    expect(c.code).toBe("DEAL-X");
+    expect(c.dealName).toBe("Counter v1");
+    expect(c.projectSF).toBe(300_000);
+    expect(c.leaseSF).toBe(100_000);
+    expect(c.baseRatePSF).toBe(9.5);
+    expect(c.leaseTermMonths).toBe(84);
+    expect(c.freeRentMonths).toBe(4);
+    expect(c.tiAllowancePSF).toBe(7);
+    expect(c.lcLLRepPercent).toBeCloseTo(0.03, 10);
+    expect(c.lcTenantRepPercent).toBeCloseTo(0.06, 10);
+  });
+
+  it("uses the execution date as the signed date", () => {
+    const c = scenarioToComp(inputs, globals);
+    expect(c.signedDate).toBe("2026-04-01");
+    expect(c.commencementDate).toBe("2026-06-01");
+  });
+
+  it("falls back to scenario name when dealCode is unset", () => {
+    const c = scenarioToComp({ ...inputs, dealCode: undefined }, globals);
+    expect(c.code).toBe("Counter v1");
+  });
+
+  it("seeds a non-zero NER snapshot from the calc engine", () => {
+    const c = scenarioToComp(inputs, globals);
+    expect(c.ner).toBeDefined();
+    expect(c.ner!.discounted).toBeGreaterThan(0);
+    expect(c.ner!.totalBasisPSF).toBeGreaterThan(0);
+  });
+
+  it("starts as PROPOSAL with an audit-trail note", () => {
+    const c = scenarioToComp(inputs, globals);
+    expect(c.status).toBe("PROPOSAL");
+    expect(c.notes).toMatch(/Captured from analyzer scenario "Counter v1"/);
   });
 });

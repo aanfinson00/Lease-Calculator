@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,10 +44,25 @@ export function CompForm({ initial }: Props) {
   const globals = useAppStore((s) => s.globals);
   const addComp = useAppStore((s) => s.addComp);
   const updateComp = useAppStore((s) => s.updateComp);
+  const compDraft = useAppStore((s) => s.compDraft);
+  const setCompDraft = useAppStore((s) => s.setCompDraft);
 
   const isEdit = !!initial;
-  const [comp, setComp] = useState<Comp>(initial ?? defaultComp());
+  // Pickup order: explicit `initial` (edit mode) > one-shot compDraft
+  // (round-trip from analyzer) > blank default. The draft is consumed
+  // exactly once and cleared so refreshing the page doesn't keep
+  // pre-filling stale data.
+  const [comp, setComp] = useState<Comp>(() => {
+    if (initial) return initial;
+    if (compDraft) return compDraft;
+    return defaultComp();
+  });
   const [showErrors, setShowErrors] = useState(false);
+
+  useEffect(() => {
+    if (!initial && compDraft) setCompDraft(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const errors = useMemo(() => validateComp(comp), [comp]);
   const errorByField = useMemo(() => {

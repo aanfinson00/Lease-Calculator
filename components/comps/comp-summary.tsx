@@ -14,6 +14,12 @@ interface Props {
  * flat-divided look as the analyzer HeadlineCard, smaller font.
  */
 export function CompSummaryStats({ summary, total }: Props) {
+  // Avg NER tiles only render meaningful values when every comp in the
+  // filtered set has a cached snapshot. If only some have snapshots, we
+  // surface the partial coverage so the user knows to hit Recompute.
+  const allHaveSnapshot = summary.nerSnapshotCount === summary.count && summary.count > 0;
+  const partial = summary.nerSnapshotCount > 0 && !allHaveSnapshot;
+
   const stats = [
     {
       label: "Comps",
@@ -26,14 +32,21 @@ export function CompSummaryStats({ summary, total }: Props) {
       value: fmtCurrency(summary.avgBaseRatePSF, 2),
     },
     {
+      label: "Avg Disc NER",
+      unit: "$/SF",
+      value: allHaveSnapshot
+        ? fmtCurrency(summary.avgDiscountedNER!, 2)
+        : "-",
+      sub: partial
+        ? `${summary.nerSnapshotCount}/${summary.count}`
+        : !allHaveSnapshot
+          ? "Recompute"
+          : undefined,
+    },
+    {
       label: "Avg Term",
       unit: "mo",
       value: fmtNumber(summary.avgTermMonths, 0),
-    },
-    {
-      label: "Avg TI",
-      unit: "$/SF",
-      value: fmtCurrency(summary.avgTIPSF, 2),
     },
     {
       label: "Avg Combined LC",

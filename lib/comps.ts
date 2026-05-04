@@ -398,6 +398,46 @@ export function computeCompSnapshot(comp: Comp, globals: Globals): CompNERSnapsh
   }
 }
 
+/**
+ * Build a draft Comp from a scenario the user has been working on in
+ * the analyzer. Intake-form-required fields that the scenario has are
+ * filled in directly; everything the analyzer doesn't track (market,
+ * subtype, signed date, broker, etc.) is left blank for the user to
+ * supply at save time. The NER snapshot is computed up-front so the
+ * form's preview opens with the live answer.
+ */
+export function scenarioToComp(
+  inputs: ScenarioInputs,
+  globals: Globals,
+): Comp {
+  const base = defaultComp();
+  const draft: Comp = {
+    ...base,
+    code: inputs.dealCode || inputs.name || base.code,
+    dealName: inputs.name || base.dealName,
+    tenantName: "",
+    status: "PROPOSAL",
+    signedDate: inputs.leaseExecutionDate || undefined,
+    commencementDate: inputs.leaseCommencement || base.commencementDate,
+    projectSF: inputs.projectSF,
+    buildingSF: inputs.buildingSF,
+    leaseSF: inputs.proposedLeaseSF,
+    baseRatePSF: inputs.baseRatePSF,
+    escalation: inputs.escalation,
+    leaseTermMonths: inputs.leaseTermMonths,
+    freeRentMonths: inputs.freeRentMonths,
+    tiAllowancePSF: inputs.tiAllowancePSF,
+    tiDurationMonths: inputs.tiDurationMonths,
+    lcLLRepPercent: inputs.lcLLRepPercent,
+    lcTenantRepPercent: inputs.lcTenantRepPercent,
+    leaseStructure: "NNN",
+    dataSource: "INTERNAL",
+    notes: `Captured from analyzer scenario "${inputs.name}".`,
+  };
+  draft.ner = computeCompSnapshot(draft, globals);
+  return draft;
+}
+
 // ---------------------------------------------------------------------------
 // Filtering, sorting, summarizing — pure helpers used by the index page
 // ---------------------------------------------------------------------------
@@ -528,6 +568,12 @@ export interface CompSummary {
   avgTermMonths: number;
   avgTIPSF: number;
   avgCombinedLCPercent: number; // decimal (e.g. 0.09 = 9%)
+  /** How many comps have a cached `ner` snapshot among the input list. */
+  nerSnapshotCount: number;
+  /** Avg of cached discounted NER (only over comps with a snapshot). */
+  avgDiscountedNER?: number;
+  /** Avg of cached undiscounted NER (only over comps with a snapshot). */
+  avgUndiscountedNER?: number;
 }
 
 export function summarizeComps(comps: Comp[]): CompSummary {
@@ -539,17 +585,26 @@ export function summarizeComps(comps: Comp[]): CompSummary {
       avgTermMonths: 0,
       avgTIPSF: 0,
       avgCombinedLCPercent: 0,
+      nerSnapshotCount: 0,
     };
   }
   let baseSum = 0;
   let termSum = 0;
   let tiSum = 0;
   let lcSum = 0;
+  let discSum = 0;
+  let undiscSum = 0;
+  let snapshotCount = 0;
   for (const c of comps) {
     baseSum += c.baseRatePSF;
     termSum += c.leaseTermMonths;
     tiSum += c.tiAllowancePSF;
     lcSum += c.lcLLRepPercent + c.lcTenantRepPercent;
+    if (c.ner) {
+      discSum += c.ner.discounted;
+      undiscSum += c.ner.undiscounted;
+      snapshotCount += 1;
+    }
   }
   return {
     count: n,
@@ -557,6 +612,9 @@ export function summarizeComps(comps: Comp[]): CompSummary {
     avgTermMonths: termSum / n,
     avgTIPSF: tiSum / n,
     avgCombinedLCPercent: lcSum / n,
+    nerSnapshotCount: snapshotCount,
+    avgDiscountedNER: snapshotCount > 0 ? discSum / snapshotCount : undefined,
+    avgUndiscountedNER: snapshotCount > 0 ? undiscSum / snapshotCount : undefined,
   };
 }
 

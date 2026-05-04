@@ -123,6 +123,18 @@ interface Actions {
   // Hold-NER (transient)
   holdNer: HoldNerState | null;
   setHoldNer: (state: HoldNerState | null) => void;
+
+  // Round-trip "save scenario as comp" draft (transient).
+  // Set by ScenarioBar's Save-as-comp action; consumed once by the
+  // intake form on mount and then cleared.
+  compDraft: Comp | null;
+  setCompDraft: (draft: Comp | null) => void;
+
+  // Comp ids picked for the multi-comp compare view (transient).
+  // The /comps/compare page reads from this slot instead of taking
+  // a URL parameter so we don't have to comma-encode many UUIDs.
+  compareIds: string[];
+  setCompareIds: (ids: string[]) => void;
 }
 
 export type AppStore = PersistedState & Actions;
@@ -161,6 +173,8 @@ export const useAppStore = create<AppStore>()(
     (set, get) => ({
       ...makeInitialState(),
       holdNer: null,
+      compDraft: null,
+      compareIds: [],
 
       setPropertyName: (name) => set({ property: { name } }),
 
@@ -256,6 +270,9 @@ export const useAppStore = create<AppStore>()(
         set((s) => ({ deals: s.deals.filter((c) => c.id !== id) })),
 
       setHoldNer: (holdNer) => set({ holdNer }),
+
+      setCompDraft: (compDraft) => set({ compDraft }),
+      setCompareIds: (compareIds) => set({ compareIds }),
     }),
     {
       name: "lease-calculator/v1",

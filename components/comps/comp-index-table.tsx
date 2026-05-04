@@ -13,13 +13,22 @@ interface Props {
   comps: Comp[];
   sort: CompSort;
   onSortChange: (s: CompSort) => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
 /**
  * Sortable browse table. Filtering + state live in the parent page so
- * the sidebar can drive the same list through pure helpers.
+ * the sidebar can drive the same list through pure helpers. Selection
+ * (for multi-comp compare) is also lifted to the parent.
  */
-export function CompIndexTable({ comps, sort, onSortChange }: Props) {
+export function CompIndexTable({
+  comps,
+  sort,
+  onSortChange,
+  selectedIds,
+  onSelectionChange,
+}: Props) {
   const deleteComp = useAppStore((s) => s.deleteComp);
   const aId = useAppStore((s) => s.comparison.aId);
   const bId = useAppStore((s) => s.comparison.bId);
@@ -43,11 +52,41 @@ export function CompIndexTable({ comps, sort, onSortChange }: Props) {
     toast(`Deleted ${comp.code}`, "info");
   };
 
+  const visibleIds = comps.map((c) => c.id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const someSelected = !allSelected && visibleIds.some((id) => selectedIds.includes(id));
+  const toggleAll = () => {
+    if (allSelected) {
+      onSelectionChange(selectedIds.filter((id) => !visibleIds.includes(id)));
+    } else {
+      const set = new Set(selectedIds);
+      for (const id of visibleIds) set.add(id);
+      onSelectionChange(Array.from(set));
+    }
+  };
+  const toggleOne = (id: string) => {
+    onSelectionChange(
+      selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id],
+    );
+  };
+
   return (
     <div className="overflow-x-auto rounded-md border">
       <table className="min-w-full text-xs tabular-nums">
         <thead className="bg-[var(--color-muted)]">
           <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">
+            <th className="px-3 py-2">
+              <input
+                type="checkbox"
+                aria-label="Select all visible comps"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected;
+                }}
+                onChange={toggleAll}
+                className="size-3.5 accent-[var(--color-primary)]"
+              />
+            </th>
             <SortHeader label="Code" k="code" sort={sort} onSortChange={onSortChange} />
             <SortHeader label="Deal · Tenant" k="dealName" sort={sort} onSortChange={onSortChange} />
             <SortHeader label="Market" k="market" sort={sort} onSortChange={onSortChange} />
@@ -65,6 +104,15 @@ export function CompIndexTable({ comps, sort, onSortChange }: Props) {
         <tbody>
           {comps.map((c) => (
             <tr key={c.id} className="border-t hover:bg-[var(--color-muted)]/40">
+              <td className="px-3 py-2">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${c.code} for comparison`}
+                  checked={selectedIds.includes(c.id)}
+                  onChange={() => toggleOne(c.id)}
+                  className="size-3.5 accent-[var(--color-primary)]"
+                />
+              </td>
               <td className="px-3 py-2 font-medium">
                 <Link href={`/comps/edit?id=${c.id}`} className="hover:underline">
                   {c.code}
@@ -142,7 +190,7 @@ export function CompIndexTable({ comps, sort, onSortChange }: Props) {
           ))}
           {comps.length === 0 && (
             <tr>
-              <td colSpan={12} className="px-3 py-6 text-center text-[var(--color-muted-foreground)]">
+              <td colSpan={13} className="px-3 py-6 text-center text-[var(--color-muted-foreground)]">
                 No comps match the current filters.
               </td>
             </tr>
