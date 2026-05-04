@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   compAsScenarioPatch,
+  compsToCsv,
+  csvHeader,
   defaultComp,
+  emptyFilters,
+  filterComps,
+  hasActiveFilters,
   parseComps,
   parseUSDate,
+  sortComps,
+  summarizeComps,
   validateComp,
   type Comp,
 } from "./comps";
@@ -162,5 +169,200 @@ describe("validateComp", () => {
   it("flags zero SF", () => {
     const c = { ...filled(), leaseSF: 0 };
     expect(validateComp(c).find((e) => e.field === "leaseSF")).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Filter / sort / summary / CSV helpers
+// ---------------------------------------------------------------------------
+
+const baseComp = (overrides: Partial<Comp> = {}): Comp => ({
+  ...defaultComp(),
+  code: "C-1",
+  dealName: "Deal 1",
+  tenantName: "Tenant",
+  status: "EXECUTED",
+  commencementDate: "2026-01-01",
+  projectSF: 100_000,
+  buildingSF: 100_000,
+  leaseSF: 50_000,
+  baseRatePSF: 10,
+  escalation: 0.03,
+  leaseTermMonths: 60,
+  freeRentMonths: 6,
+  tiAllowancePSF: 5,
+  lcLLRepPercent: 0.03,
+  lcTenantRepPercent: 0.06,
+  leaseStructure: "NNN",
+  ...overrides,
+});
+
+describe("hasActiveFilters", () => {
+  it("returns false when nothing is set", () => {
+    expect(hasActiveFilters(emptyFilters())).toBe(false);
+  });
+
+  it("returns true when search has any non-whitespace text", () => {
+    expect(hasActiveFilters({ ...emptyFilters(), search: "acme" })).toBe(true);
+  });
+
+  it("ignores whitespace-only search", () => {
+    expect(hasActiveFilters({ ...emptyFilters(), search: "   " })).toBe(false);
+  });
+
+  it("returns true when any range bound is set", () => {
+    expect(hasActiveFilters({ ...emptyFilters(), termMonths: { min: 12 } })).toBe(true);
+  });
+});
+
+describe("filterComps", () => {
+  const corpus: Comp[] = [
+    baseComp({ id: "1", code: "A-1", market: "IE West", baseRatePSF: 8, leaseTermMonths: 60, leaseSF: 50_000, status: "EXECUTED", propertySubtype: "WAREHOUSE", buildingClass: "A" }),
+    baseComp({ id: "2", code: "A-2", market: "IE East", baseRatePSF: 12, leaseTermMonths: 84, leaseSF: 100_000, status: "PROPOSAL", propertySubtype: "DISTRIBUTION", buildingClass: "B" }),
+    baseComp({ id: "3", code: "A-3", market: "IE West", baseRatePSF: 15, leaseTermMonths: 120, leaseSF: 200_000, status: "RENEWAL", propertySubtype: "WAREHOUSE" }),
+  ];
+
+  it("matches search across code, deal, tenant, market, submarket", () => {
+    expect(filterComps(corpus, { ...emptyFilters(), search: "ie east" })).toHaveLength(1);
+    expect(filterComps(corpus, { ...emptyFilters(), search: "A-3" })).toHaveLength(1);
+  });
+
+  it("filters by multi-select status", () => {
+    const r = filterComps(corpus, { ...emptyFilters(), statuses: ["EXECUTED", "RENEWAL"] });
+    expect(r.map((c) => c.code).sort()).toEqual(["A-1", "A-3"]);
+  });
+
+  it("filters by subtype + class together (AND across categories)", () => {
+    const r = filterComps(corpus, {
+      ...emptyFilters(),
+      subtypes: ["WAREHOUSE"],
+      classes: ["A"],
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]!.code).toBe("A-1");
+  });
+
+  it("filters by market multi-select", () => {
+    const r = filterComps(corpus, { ...emptyFilters(), markets: ["IE West"] });
+    expect(r.map((c) => c.code).sort()).toEqual(["A-1", "A-3"]);
+  });
+
+  it("applies term + base rate ranges (inclusive)", () => {
+    const r = filterComps(corpus, {
+      ...emptyFilters(),
+      termMonths: { min: 60, max: 84 },
+      baseRatePSF: { min: 10, max: 15 },
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]!.code).toBe("A-2");
+  });
+
+  it("returns empty when no comp matches", () => {
+    expect(filterComps(corpus, { ...emptyFilters(), search: "nope" })).toEqual([]);
+  });
+
+  it("returns the full list when filters are empty", () => {
+    expect(filterComps(corpus, emptyFilters())).toHaveLength(3);
+  });
+});
+
+describe("sortComps", () => {
+  const corpus: Comp[] = [
+    baseComp({ id: "1", code: "B", baseRatePSF: 10, leaseTermMonths: 60, status: "RENEWAL", lcLLRepPercent: 0.02, lcTenantRepPercent: 0.04, modifiedAt: "2026-01-01T00:00:00Z" }),
+    baseComp({ id: "2", code: "A", baseRatePSF: 15, leaseTermMonths: 36, status: "EXECUTED", lcLLRepPercent: 0.03, lcTenantRepPercent: 0.06, modifiedAt: "2026-02-01T00:00:00Z" }),
+    baseComp({ id: "3", code: "C", baseRatePSF: 8, leaseTermMonths: 120, status: "PROPOSAL", lcLLRepPercent: 0.04, lcTenantRepPercent: 0.08, modifiedAt: "2026-03-01T00:00:00Z" }),
+  ];
+
+  it("sorts by code asc", () => {
+    expect(sortComps(corpus, { key: "code", dir: "asc" }).map((c) => c.code)).toEqual(["A", "B", "C"]);
+  });
+
+  it("sorts by code desc", () => {
+    expect(sortComps(corpus, { key: "code", dir: "desc" }).map((c) => c.code)).toEqual(["C", "B", "A"]);
+  });
+
+  it("sorts numerically by base rate", () => {
+    expect(sortComps(corpus, { key: "baseRatePSF", dir: "asc" }).map((c) => c.baseRatePSF)).toEqual([8, 10, 15]);
+  });
+
+  it("sorts by combined LC (derived field)", () => {
+    expect(sortComps(corpus, { key: "combinedLC", dir: "asc" }).map((c) => c.code)).toEqual(["B", "A", "C"]);
+  });
+
+  it("sorts status by enum priority (EXECUTED first)", () => {
+    expect(sortComps(corpus, { key: "status", dir: "asc" }).map((c) => c.status)).toEqual([
+      "EXECUTED",
+      "RENEWAL",
+      "PROPOSAL",
+    ]);
+  });
+
+  it("sorts by modifiedAt", () => {
+    expect(sortComps(corpus, { key: "modifiedAt", dir: "desc" }).map((c) => c.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const original = [...corpus];
+    sortComps(corpus, { key: "code", dir: "desc" });
+    expect(corpus).toEqual(original);
+  });
+});
+
+describe("summarizeComps", () => {
+  it("returns zeroes for an empty list", () => {
+    expect(summarizeComps([])).toEqual({
+      count: 0,
+      avgBaseRatePSF: 0,
+      avgTermMonths: 0,
+      avgTIPSF: 0,
+      avgCombinedLCPercent: 0,
+    });
+  });
+
+  it("averages numeric fields across the list", () => {
+    const corpus: Comp[] = [
+      baseComp({ baseRatePSF: 10, leaseTermMonths: 60, tiAllowancePSF: 5, lcLLRepPercent: 0.03, lcTenantRepPercent: 0.06 }),
+      baseComp({ baseRatePSF: 20, leaseTermMonths: 120, tiAllowancePSF: 15, lcLLRepPercent: 0.05, lcTenantRepPercent: 0.10 }),
+    ];
+    const s = summarizeComps(corpus);
+    expect(s.count).toBe(2);
+    expect(s.avgBaseRatePSF).toBe(15);
+    expect(s.avgTermMonths).toBe(90);
+    expect(s.avgTIPSF).toBe(10);
+    expect(s.avgCombinedLCPercent).toBeCloseTo(0.12, 6);
+  });
+});
+
+describe("compsToCsv / csvHeader / csvEscape", () => {
+  it("emits a header line + one row per comp", () => {
+    const corpus = [
+      baseComp({ id: "1", code: "A", dealName: "Plain" }),
+      baseComp({ id: "2", code: "B", dealName: "Plain" }),
+    ];
+    const csv = compsToCsv(corpus);
+    const lines = csv.split("\n");
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe(csvHeader());
+    expect(lines[0]).toContain("code");
+    expect(lines[0]).toContain("modifiedAt");
+  });
+
+  it("quotes fields containing commas", () => {
+    const c = baseComp({ notes: "Has, a comma" });
+    const csv = compsToCsv([c]);
+    expect(csv).toContain('"Has, a comma"');
+  });
+
+  it("escapes embedded quotes by doubling", () => {
+    const c = baseComp({ notes: 'Has "quotes"' });
+    const csv = compsToCsv([c]);
+    expect(csv).toContain('"Has ""quotes"""');
+  });
+
+  it("handles undefined optional fields as empty strings", () => {
+    const c = baseComp({ market: undefined, submarket: undefined, notes: undefined });
+    const row = compsToCsv([c]).split("\n")[1]!;
+    // Two consecutive commas signal an empty cell.
+    expect(row).toMatch(/,,/);
   });
 });

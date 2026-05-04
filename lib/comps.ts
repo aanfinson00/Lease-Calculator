@@ -397,3 +397,230 @@ export function computeCompSnapshot(comp: Comp, globals: Globals): CompNERSnapsh
     return { undiscounted: 0, discounted: 0, totalBasisPSF: 0 };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Filtering, sorting, summarizing — pure helpers used by the index page
+// ---------------------------------------------------------------------------
+
+export interface CompFilters {
+  search: string;
+  statuses: LeaseStatus[];
+  subtypes: PropertySubtype[];
+  classes: BuildingClass[];
+  markets: string[];
+  termMonths: { min?: number; max?: number };
+  baseRatePSF: { min?: number; max?: number };
+  leaseSF: { min?: number; max?: number };
+}
+
+export const emptyFilters = (): CompFilters => ({
+  search: "",
+  statuses: [],
+  subtypes: [],
+  classes: [],
+  markets: [],
+  termMonths: {},
+  baseRatePSF: {},
+  leaseSF: {},
+});
+
+export function hasActiveFilters(f: CompFilters): boolean {
+  return (
+    f.search.trim().length > 0 ||
+    f.statuses.length > 0 ||
+    f.subtypes.length > 0 ||
+    f.classes.length > 0 ||
+    f.markets.length > 0 ||
+    f.termMonths.min != null ||
+    f.termMonths.max != null ||
+    f.baseRatePSF.min != null ||
+    f.baseRatePSF.max != null ||
+    f.leaseSF.min != null ||
+    f.leaseSF.max != null
+  );
+}
+
+const inRange = (v: number, r: { min?: number; max?: number }): boolean =>
+  (r.min == null || v >= r.min) && (r.max == null || v <= r.max);
+
+export function filterComps(comps: Comp[], f: CompFilters): Comp[] {
+  const q = f.search.trim().toLowerCase();
+  return comps.filter((c) => {
+    if (q) {
+      const hay = `${c.code} ${c.dealName} ${c.tenantName} ${c.market ?? ""} ${c.submarket ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (f.statuses.length > 0 && !f.statuses.includes(c.status)) return false;
+    if (f.subtypes.length > 0 && (!c.propertySubtype || !f.subtypes.includes(c.propertySubtype))) return false;
+    if (f.classes.length > 0 && (!c.buildingClass || !f.classes.includes(c.buildingClass))) return false;
+    if (f.markets.length > 0 && (!c.market || !f.markets.includes(c.market))) return false;
+    if (!inRange(c.leaseTermMonths, f.termMonths)) return false;
+    if (!inRange(c.baseRatePSF, f.baseRatePSF)) return false;
+    if (!inRange(c.leaseSF, f.leaseSF)) return false;
+    return true;
+  });
+}
+
+export type CompSortKey =
+  | "code"
+  | "dealName"
+  | "market"
+  | "propertySubtype"
+  | "leaseSF"
+  | "baseRatePSF"
+  | "leaseTermMonths"
+  | "freeRentMonths"
+  | "tiAllowancePSF"
+  | "combinedLC"
+  | "status"
+  | "modifiedAt";
+
+export interface CompSort {
+  key: CompSortKey;
+  dir: "asc" | "desc";
+}
+
+const STATUS_ORDER: Record<LeaseStatus, number> = {
+  EXECUTED: 0,
+  RENEWAL: 1,
+  PROPOSAL: 2,
+  LOI: 3,
+  DEAD: 4,
+};
+
+function compareValues(a: unknown, b: unknown): number {
+  // Nulls / undefined sort last regardless of direction.
+  const aNil = a == null || a === "";
+  const bNil = b == null || b === "";
+  if (aNil && bNil) return 0;
+  if (aNil) return 1;
+  if (bNil) return -1;
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+function sortValueFor(c: Comp, key: CompSortKey): unknown {
+  switch (key) {
+    case "combinedLC":
+      return c.lcLLRepPercent + c.lcTenantRepPercent;
+    case "status":
+      return STATUS_ORDER[c.status];
+    default:
+      return c[key];
+  }
+}
+
+export function sortComps(comps: Comp[], sort: CompSort): Comp[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  return [...comps].sort((a, b) => {
+    const cmp = compareValues(sortValueFor(a, sort.key), sortValueFor(b, sort.key));
+    // Tie-break on modifiedAt desc so order is stable across renders.
+    if (cmp === 0 && sort.key !== "modifiedAt") {
+      return -compareValues(a.modifiedAt, b.modifiedAt);
+    }
+    return cmp * dir;
+  });
+}
+
+export interface CompSummary {
+  count: number;
+  avgBaseRatePSF: number;
+  avgTermMonths: number;
+  avgTIPSF: number;
+  avgCombinedLCPercent: number; // decimal (e.g. 0.09 = 9%)
+}
+
+export function summarizeComps(comps: Comp[]): CompSummary {
+  const n = comps.length;
+  if (n === 0) {
+    return {
+      count: 0,
+      avgBaseRatePSF: 0,
+      avgTermMonths: 0,
+      avgTIPSF: 0,
+      avgCombinedLCPercent: 0,
+    };
+  }
+  let baseSum = 0;
+  let termSum = 0;
+  let tiSum = 0;
+  let lcSum = 0;
+  for (const c of comps) {
+    baseSum += c.baseRatePSF;
+    termSum += c.leaseTermMonths;
+    tiSum += c.tiAllowancePSF;
+    lcSum += c.lcLLRepPercent + c.lcTenantRepPercent;
+  }
+  return {
+    count: n,
+    avgBaseRatePSF: baseSum / n,
+    avgTermMonths: termSum / n,
+    avgTIPSF: tiSum / n,
+    avgCombinedLCPercent: lcSum / n,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// CSV export — standardized column set (one column per Comp field).
+// Not round-trippable through parseComps (which uses the legacy header).
+// ---------------------------------------------------------------------------
+
+const CSV_COLUMNS: readonly { header: string; field: keyof Comp }[] = [
+  { header: "id", field: "id" },
+  { header: "code", field: "code" },
+  { header: "dealName", field: "dealName" },
+  { header: "tenantName", field: "tenantName" },
+  { header: "tenantIndustry", field: "tenantIndustry" },
+  { header: "status", field: "status" },
+  { header: "signedDate", field: "signedDate" },
+  { header: "commencementDate", field: "commencementDate" },
+  { header: "propertyName", field: "propertyName" },
+  { header: "market", field: "market" },
+  { header: "submarket", field: "submarket" },
+  { header: "propertySubtype", field: "propertySubtype" },
+  { header: "buildingClass", field: "buildingClass" },
+  { header: "clearHeightFt", field: "clearHeightFt" },
+  { header: "yearBuilt", field: "yearBuilt" },
+  { header: "projectSF", field: "projectSF" },
+  { header: "buildingSF", field: "buildingSF" },
+  { header: "leaseSF", field: "leaseSF" },
+  { header: "baseRatePSF", field: "baseRatePSF" },
+  { header: "escalation", field: "escalation" },
+  { header: "leaseTermMonths", field: "leaseTermMonths" },
+  { header: "freeRentMonths", field: "freeRentMonths" },
+  { header: "tiAllowancePSF", field: "tiAllowancePSF" },
+  { header: "tiDurationMonths", field: "tiDurationMonths" },
+  { header: "lcLLRepPercent", field: "lcLLRepPercent" },
+  { header: "lcTenantRepPercent", field: "lcTenantRepPercent" },
+  { header: "leaseStructure", field: "leaseStructure" },
+  { header: "dataSource", field: "dataSource" },
+  { header: "brokerName", field: "brokerName" },
+  { header: "notes", field: "notes" },
+  { header: "createdAt", field: "createdAt" },
+  { header: "modifiedAt", field: "modifiedAt" },
+];
+
+export function csvHeader(): string {
+  return CSV_COLUMNS.map((c) => c.header).join(",");
+}
+
+/**
+ * Quote a field if it contains commas, quotes, or newlines (RFC 4180).
+ * Escapes embedded quotes by doubling them.
+ */
+function csvEscape(v: unknown): string {
+  if (v == null) return "";
+  const s = typeof v === "number" ? String(v) : String(v);
+  if (s === "") return "";
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+export function compToCsvRow(c: Comp): string {
+  return CSV_COLUMNS.map(({ field }) => csvEscape(c[field])).join(",");
+}
+
+export function compsToCsv(comps: Comp[]): string {
+  const lines = [csvHeader(), ...comps.map(compToCsvRow)];
+  return lines.join("\n");
+}

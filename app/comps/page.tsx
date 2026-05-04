@@ -1,14 +1,25 @@
 "use client";
 
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRef } from "react";
-import { ArrowLeft, Database, Plus, Upload } from "lucide-react";
+import { ArrowLeft, Database, Download, Plus, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CompFilterSidebar } from "@/components/comps/comp-filter-sidebar";
 import { CompIndexTable } from "@/components/comps/comp-index-table";
+import { CompSummaryStats } from "@/components/comps/comp-summary";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/toaster";
-import { parseComps } from "@/lib/comps";
+import {
+  compsToCsv,
+  emptyFilters,
+  filterComps,
+  parseComps,
+  sortComps,
+  summarizeComps,
+  type CompFilters,
+  type CompSort,
+} from "@/lib/comps";
 import { useAppStore, useHasHydrated } from "@/lib/store";
 import { toast } from "@/lib/toast";
 
@@ -17,6 +28,13 @@ export default function CompsIndex() {
   const comps = useAppStore((s) => s.deals);
   const setDeals = useAppStore((s) => s.setDeals);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [filters, setFilters] = useState<CompFilters>(emptyFilters);
+  const [sort, setSort] = useState<CompSort>({ key: "modifiedAt", dir: "desc" });
+
+  const filtered = useMemo(() => filterComps(comps, filters), [comps, filters]);
+  const sorted = useMemo(() => sortComps(filtered, sort), [filtered, sort]);
+  const summary = useMemo(() => summarizeComps(filtered), [filtered]);
 
   const handleFile = (file: File) => {
     const reader = new FileReader();
@@ -29,9 +47,6 @@ export default function CompsIndex() {
           toast("No deal rows found in the file.", "error");
           return;
         }
-        // Append, not replace, so the user can build the index across
-        // multiple uploads. If they want a fresh start they can clear
-        // and re-upload.
         setDeals([...comps, ...parsed]);
         toast(`Imported ${parsed.length} comp${parsed.length === 1 ? "" : "s"}`, "success");
       } catch (e) {
@@ -47,6 +62,22 @@ export default function CompsIndex() {
     e.target.value = "";
   };
 
+  const exportCsv = () => {
+    if (sorted.length === 0) return;
+    const csv = compsToCsv(sorted);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const date = new Date().toISOString().slice(0, 10);
+    link.download = `comps-${date}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast(`Exported ${sorted.length} comp${sorted.length === 1 ? "" : "s"}`, "success");
+  };
+
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center text-xs text-[var(--color-muted-foreground)]">
@@ -54,6 +85,8 @@ export default function CompsIndex() {
       </div>
     );
   }
+
+  const exportDisabled = sorted.length === 0;
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
@@ -83,6 +116,15 @@ export default function CompsIndex() {
             className="hidden"
             onChange={onFileChange}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCsv}
+            disabled={exportDisabled}
+            title={exportDisabled ? "No comps to export" : "Export the filtered list to CSV"}
+          >
+            <Download className="size-4" /> Export CSV
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -129,7 +171,13 @@ export default function CompsIndex() {
           </CardContent>
         </Card>
       ) : (
-        <CompIndexTable />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px,1fr]">
+          <CompFilterSidebar comps={comps} filters={filters} onChange={setFilters} />
+          <div className="flex flex-col gap-4">
+            <CompSummaryStats summary={summary} total={comps.length} />
+            <CompIndexTable comps={sorted} sort={sort} onSortChange={setSort} />
+          </div>
+        </div>
       )}
 
       <Toaster />
