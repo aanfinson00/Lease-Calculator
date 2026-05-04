@@ -50,7 +50,7 @@ export function CompSummaryStats({ summary, total }: Props) {
     },
     {
       label: "Avg Combined LC",
-      value: fmtPercent(summary.avgCombinedLCPercent * 100, 2),
+      value: fmtPercent(summary.avgCombinedLCPercent, 2),
     },
   ];
 

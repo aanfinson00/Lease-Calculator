@@ -283,15 +283,15 @@ export function ComparisonDoc({
     { label: "Lease SF", a: fmtNumber(aInputs.proposedLeaseSF, 0), b: fmtNumber(bInputs.proposedLeaseSF, 0) },
 
     { section: "Rent", label: "Base Rate ($/SF)", a: fmtCurrency(aInputs.baseRatePSF, 2), b: fmtCurrency(bInputs.baseRatePSF, 2) },
-    { label: "Escalation (annual)", a: fmtPercent(aInputs.escalation * 100, 2), b: fmtPercent(bInputs.escalation * 100, 2) },
+    { label: "Escalation (annual)", a: fmtPercent(aInputs.escalation, 2), b: fmtPercent(bInputs.escalation, 2) },
 
     { section: "Concessions", label: "TI Allowance ($/SF)", a: fmtCurrency(aInputs.tiAllowancePSF, 2), b: fmtCurrency(bInputs.tiAllowancePSF, 2) },
     { label: "TI Duration (mo)", a: fmtNumber(aInputs.tiDurationMonths, 0), b: fmtNumber(bInputs.tiDurationMonths, 0) },
     { label: "Free Rent (mo)", a: fmtNumber(aInputs.freeRentMonths, 0), b: fmtNumber(bInputs.freeRentMonths, 0) },
 
-    { section: "Leasing Commissions", label: "Landlord Rep (%)", a: fmtPercent(aInputs.lcLLRepPercent * 100, 2), b: fmtPercent(bInputs.lcLLRepPercent * 100, 2) },
-    { label: "Tenant Rep (%)", a: fmtPercent(aInputs.lcTenantRepPercent * 100, 2), b: fmtPercent(bInputs.lcTenantRepPercent * 100, 2) },
-    { label: "Combined LC (%)", a: fmtPercent((aInputs.lcLLRepPercent + aInputs.lcTenantRepPercent) * 100, 2), b: fmtPercent((bInputs.lcLLRepPercent + bInputs.lcTenantRepPercent) * 100, 2) },
+    { section: "Leasing Commissions", label: "Landlord Rep (%)", a: fmtPercent(aInputs.lcLLRepPercent, 2), b: fmtPercent(bInputs.lcLLRepPercent, 2) },
+    { label: "Tenant Rep (%)", a: fmtPercent(aInputs.lcTenantRepPercent, 2), b: fmtPercent(bInputs.lcTenantRepPercent, 2) },
+    { label: "Combined LC (%)", a: fmtPercent(aInputs.lcLLRepPercent + aInputs.lcTenantRepPercent, 2), b: fmtPercent(bInputs.lcLLRepPercent + bInputs.lcTenantRepPercent, 2) },
     { label: "LC Calc", a: aInputs.lcCalculation === "tiered" ? "Tiered" : "Flat", b: bInputs.lcCalculation === "tiered" ? "Tiered" : "Flat" },
     { label: "LC Payment", a: aInputs.lcStructure === "split50" ? "50/50" : "Upfront", b: bInputs.lcStructure === "split50" ? "50/50" : "Upfront" },
 
@@ -300,7 +300,7 @@ export function ComparisonDoc({
     { label: "Commencement date", a: fmtDate(aInputs.leaseCommencement), b: fmtDate(bInputs.leaseCommencement) },
 
     { section: "Shared assumptions", label: "Current Basis ($/SF)", a: fmtCurrency(globals.projectBasisPSF, 2), b: fmtCurrency(globals.projectBasisPSF, 2) },
-    { label: "Discount rate", a: fmtPercent(globals.discountRate * 100, 2), b: fmtPercent(globals.discountRate * 100, 2) },
+    { label: "Discount rate", a: fmtPercent(globals.discountRate, 2), b: fmtPercent(globals.discountRate, 2) },
     { label: "Total Basis ($/SF)", a: fmtCurrency(aResults.totalBasisPSF, 2), b: fmtCurrency(bResults.totalBasisPSF, 2) },
   ];
 

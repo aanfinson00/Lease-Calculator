@@ -266,14 +266,14 @@ function buildNumericRows(comps: Comp[], snapshots: CompNERSnapshot[]): NumericR
   return [
     buildNumericRow("Lease SF", comps, (c) => c.leaseSF, "number", "higher"),
     buildNumericRow("Base rate ($/SF)", comps, (c) => c.baseRatePSF, "currency", "higher"),
-    buildNumericRow("Escalation", comps, (c) => c.escalation * 100, "percent", "higher"),
+    buildNumericRow("Escalation", comps, (c) => c.escalation, "percent", "higher"),
     buildNumericRow("Term (mo)", comps, (c) => c.leaseTermMonths, "months", "higher"),
     buildNumericRow("Free rent (mo)", comps, (c) => c.freeRentMonths, "months", "lower"),
     buildNumericRow("TI ($/SF)", comps, (c) => c.tiAllowancePSF, "currency", "lower"),
     buildNumericRow(
       "Combined LC",
       comps,
-      (c) => (c.lcLLRepPercent + c.lcTenantRepPercent) * 100,
+      (c) => c.lcLLRepPercent + c.lcTenantRepPercent,
       "percent",
       "lower",
     ),

@@ -143,7 +143,7 @@ export function CompIndexTable({
               <td className="px-3 py-2 text-right">{c.freeRentMonths} mo</td>
               <td className="px-3 py-2 text-right">{fmtCurrency(c.tiAllowancePSF, 2)}</td>
               <td className="px-3 py-2 text-right">
-                {fmtPercent((c.lcLLRepPercent + c.lcTenantRepPercent) * 100, 2)}
+                {fmtPercent(c.lcLLRepPercent + c.lcTenantRepPercent, 2)}
               </td>
               <td className="px-3 py-2">
                 <StatusBadge status={c.status} />

@@ -382,7 +382,7 @@ export function CompForm({ initial }: Props) {
               <PreviewRow label="Total Basis" value={fmtCurrency(snapshot.totalBasisPSF, 2)} unit="$/SF" />
               <div className="border-t pt-2 text-[11px] text-[var(--color-muted-foreground)]">
                 Combined LC{" "}
-                <span className="tabular-nums">{fmtPercent((comp.lcLLRepPercent + comp.lcTenantRepPercent) * 100, 2)}</span>
+                <span className="tabular-nums">{fmtPercent(comp.lcLLRepPercent + comp.lcTenantRepPercent, 2)}</span>
               </div>
               {showErrors && errors.length > 0 && (
                 <div className="rounded-md border border-[var(--color-destructive)] bg-[var(--color-destructive)]/10 p-2 text-[11px] text-[var(--color-destructive)]">
