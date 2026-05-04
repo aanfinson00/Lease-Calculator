@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Database, Search, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { dealAsScenarioPatch, parseDeals, type Deal } from "@/lib/deals";
+import { compAsScenarioPatch, parseComps, type Comp } from "@/lib/comps";
 import { useAppStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -85,14 +85,14 @@ export function DealPicker({
     setActiveIndex(0);
   }, [query]);
 
-  const apply = (deal: Deal) => {
-    const patch = dealAsScenarioPatch(deal);
+  const apply = (comp: Comp) => {
+    const patch = compAsScenarioPatch(comp);
     for (const [k, v] of Object.entries(patch)) {
       updateInput(scenarioId, k as keyof typeof patch, v as never);
     }
     setOpen(false);
     setQuery("");
-    toast(`Loaded ${deal.code} (${deal.dealName})`, "success");
+    toast(`Loaded ${comp.code} (${comp.dealName})`, "success");
   };
 
   const handleFile = (file: File) => {
@@ -106,7 +106,7 @@ export function DealPicker({
     reader.onload = () => {
       try {
         const text = String(reader.result ?? "");
-        const parsed = parseDeals(text);
+        const parsed = parseComps(text);
         if (parsed.length === 0) {
           const msg = "No deal rows found in the file.";
           setParseError(msg);
@@ -330,11 +330,11 @@ function UploadPrompt({ onClick, error }: { onClick: () => void; error: string |
 function StatusChip({ status }: { status: string }) {
   if (!status) return null;
   const tone =
-    status === "LEASE"
+    status === "EXECUTED"
       ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
       : status === "RENEWAL"
         ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
-        : status === "SPEC"
+        : status === "PROPOSAL" || status === "LOI"
           ? "bg-[var(--color-cost)]/10 text-[var(--color-cost)]"
           : "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]";
   return (

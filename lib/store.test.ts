@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { beforeEach, describe, expect, it } from "vitest";
+import type { Comp } from "./comps";
 import { useAppStore } from "./store";
 
 // Reset store + localStorage before every test so cases don't bleed.
@@ -172,21 +173,27 @@ describe("useAppStore — persistence", () => {
 });
 
 describe("useAppStore — deals slice (uploaded CSV)", () => {
-  const fakeDeal = {
+  const fakeDeal: Comp = {
+    id: "test-comp-1",
     code: "TestCode",
     dealName: "Test Deal",
     tenantName: "Test Tenant",
+    status: "EXECUTED",
+    commencementDate: "2026-01-01",
     projectSF: 100_000,
     buildingSF: 90_000,
     leaseSF: 80_000,
     baseRatePSF: 10,
     escalation: 0.03,
     leaseTermMonths: 60,
-    commencement: "2026-01-01",
     freeRentMonths: 3,
     tiAllowancePSF: 5,
-    lcPercent: 0.06,
-    status: "LEASE",
+    tiDurationMonths: 1,
+    lcLLRepPercent: 0.02,
+    lcTenantRepPercent: 0.04,
+    leaseStructure: "NNN",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    modifiedAt: "2026-01-01T00:00:00.000Z",
   };
 
   it("starts empty", () => {

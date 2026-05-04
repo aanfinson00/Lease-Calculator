@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
+import { Database } from "lucide-react";
 import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
@@ -65,6 +67,13 @@ export default function Home() {
             <div className="flex-1"><PropertyHeader /></div>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/comps"
+              className="inline-flex h-9 items-center gap-1 rounded-md px-3 text-sm text-[var(--color-foreground)] hover:bg-[var(--color-accent)]"
+              title="Open the comp index"
+            >
+              <Database className="size-4" /> Comps
+            </Link>
             <ThemeToggle />
             <ExportPdfButton />
           </div>

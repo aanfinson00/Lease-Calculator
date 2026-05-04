@@ -19,7 +19,7 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Deal } from "./deals";
+import { newCompId, type Comp, type LeaseStatus } from "./comps";
 import type { Globals, ScenarioInputs } from "./types";
 import type { FreeVariable, NERKind } from "./solver";
 
@@ -89,10 +89,12 @@ interface PersistedState {
   scenarios: ScenarioRecord[];
   comparison: { aId: string; bId: string };
   /**
-   * User-uploaded deals from a CSV. Lives only in this browser's
-   * localStorage — never sent to the server, never committed to the repo.
+   * Comp records. Originally CSV-uploaded as `Deal[]`; v13 -> v14
+   * upgrades them to the richer `Comp` shape (intake form, more fields,
+   * stable IDs). Slice name kept as `deals` so existing persisted state
+   * keys continue to round-trip without losing data.
    */
-  deals: Deal[];
+  deals: Comp[];
 }
 
 interface Actions {
@@ -111,9 +113,12 @@ interface Actions {
   setComparisonA: (id: string) => void;
   setComparisonB: (id: string) => void;
 
-  // Deals (user-uploaded CSV)
-  setDeals: (deals: Deal[]) => void;
+  // Comps (user-uploaded CSV + intake form)
+  setDeals: (deals: Comp[]) => void;
   clearDeals: () => void;
+  addComp: (comp: Comp) => void;
+  updateComp: (id: string, patch: Partial<Comp>) => void;
+  deleteComp: (id: string) => void;
 
   // Hold-NER (transient)
   holdNer: HoldNerState | null;
@@ -235,6 +240,21 @@ export const useAppStore = create<AppStore>()(
       setDeals: (deals) => set({ deals }),
       clearDeals: () => set({ deals: [] }),
 
+      addComp: (comp) =>
+        set((s) => ({ deals: [comp, ...s.deals] })),
+
+      updateComp: (id, patch) =>
+        set((s) => ({
+          deals: s.deals.map((c) =>
+            c.id === id
+              ? { ...c, ...patch, modifiedAt: new Date().toISOString() }
+              : c,
+          ),
+        })),
+
+      deleteComp: (id) =>
+        set((s) => ({ deals: s.deals.filter((c) => c.id !== id) })),
+
       setHoldNer: (holdNer) => set({ holdNer }),
     }),
     {
@@ -247,7 +267,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 13,
+      version: 14,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -283,6 +303,15 @@ export const useAppStore = create<AppStore>()(
       //            TI + LC). Old persisted state defaulted to building-only
       //            basis; with both new fields at 0, headline numbers are
       //            preserved exactly until the user fills them in.
+      // v13 → v14: Deal[] -> Comp[] schema upgrade. Adds id, status enum,
+      //            split LL/Tenant LC, lease structure, optional metadata
+      //            (market, submarket, subtype, etc.), and createdAt/
+      //            modifiedAt timestamps. Existing rows get new fields
+      //            backfilled to safe defaults; the legacy single
+      //            lcPercent splits 1/3 LL + 2/3 Tenant Rep (the default
+      //            in dealAsScenarioPatch); legacy `commencement` renames
+      //            to `commencementDate`; status string maps via
+      //            mapLegacyStatus (LEASE -> EXECUTED, SPEC -> PROPOSAL).
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -389,6 +418,54 @@ export const useAppStore = create<AppStore>()(
           const g = state.globals as unknown as Record<string, unknown>;
           if (typeof g.landCostPSF !== "number") g.landCostPSF = 0;
           if (typeof g.softCostsPSF !== "number") g.softCostsPSF = 0;
+        }
+        if (state && version < 14 && Array.isArray(state.deals)) {
+          // Legacy Deal -> Comp: rename `commencement`, split `lcPercent`,
+          // map status string, fill in IDs + timestamps.
+          const now = new Date().toISOString();
+          state.deals = (state.deals as unknown[]).map((d): Comp => {
+            const legacy = d as Record<string, unknown>;
+            const lcPercent =
+              typeof legacy.lcPercent === "number" ? (legacy.lcPercent as number) : 0;
+            const llShare = lcPercent / 3;
+            const trShare = lcPercent - llShare;
+            const statusRaw = String(legacy.status ?? "").toUpperCase();
+            const status: LeaseStatus =
+              statusRaw === "LEASE"
+                ? "EXECUTED"
+                : statusRaw === "RENEWAL"
+                  ? "RENEWAL"
+                  : statusRaw === "SPEC"
+                    ? "PROPOSAL"
+                    : statusRaw === "PROPOSAL" ||
+                        statusRaw === "LOI" ||
+                        statusRaw === "DEAD" ||
+                        statusRaw === "EXECUTED"
+                      ? (statusRaw as LeaseStatus)
+                      : "EXECUTED";
+            return {
+              id: typeof legacy.id === "string" ? (legacy.id as string) : newCompId(),
+              code: String(legacy.code ?? ""),
+              dealName: String(legacy.dealName ?? ""),
+              tenantName: String(legacy.tenantName ?? ""),
+              status,
+              commencementDate: String(legacy.commencement ?? legacy.commencementDate ?? ""),
+              projectSF: Number(legacy.projectSF) || 0,
+              buildingSF: Number(legacy.buildingSF) || 0,
+              leaseSF: Number(legacy.leaseSF) || 0,
+              baseRatePSF: Number(legacy.baseRatePSF) || 0,
+              escalation: Number(legacy.escalation) || 0,
+              leaseTermMonths: Number(legacy.leaseTermMonths) || 0,
+              freeRentMonths: Number(legacy.freeRentMonths) || 0,
+              tiAllowancePSF: Number(legacy.tiAllowancePSF) || 0,
+              tiDurationMonths: 1,
+              lcLLRepPercent: llShare,
+              lcTenantRepPercent: trShare,
+              leaseStructure: "NNN",
+              createdAt: now,
+              modifiedAt: now,
+            };
+          });
         }
         return state as unknown as PersistedState;
       },
