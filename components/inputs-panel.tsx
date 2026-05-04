@@ -197,8 +197,9 @@ export function InputsPanel() {
   if (!a || !b) {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-[var(--color-muted-foreground)]">
-          Select two scenarios from the bar above to compare.
+        <CardContent className="flex items-center gap-3 bg-[var(--color-muted)]/30 p-6 text-sm text-[var(--color-muted-foreground)]">
+          <Info className="size-4 shrink-0" aria-hidden />
+          <span>Select two scenarios from the bar above to compare.</span>
         </CardContent>
       </Card>
     );
@@ -249,7 +250,7 @@ function WarningStrip({
   );
   if (items.length === 0) return null;
   return (
-    <div className="flex flex-col gap-1 py-3 last:pb-0">
+    <div className="flex flex-col gap-1.5 py-3 last:pb-0">
       <div className="flex flex-col gap-0.5">
         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
           Notices

@@ -171,7 +171,9 @@ function CellInput({ stored, isOverride, onCommit, inputRef }: CellInputProps) {
           }
         }}
         className={`h-8 w-24 px-2 text-right text-sm ${
-          isOverride ? "border-[var(--color-primary)] font-medium" : ""
+          isOverride
+            ? "border-[var(--color-primary)] bg-[var(--color-primary)]/5 font-medium"
+            : ""
         }`}
       />
       {isOverride ? (
