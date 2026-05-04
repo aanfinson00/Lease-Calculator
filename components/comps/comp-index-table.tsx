@@ -71,7 +71,7 @@ export function CompIndexTable({
   };
 
   return (
-    <div className="overflow-auto rounded-md border lg:min-h-0 lg:flex-1">
+    <div className="overflow-x-auto rounded-md border">
       <table className="min-w-full text-xs tabular-nums">
         <thead className="sticky top-0 z-10 bg-[var(--color-muted)] shadow-[0_1px_0_var(--color-border)]">
           <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted-foreground)]">

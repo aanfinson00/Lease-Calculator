@@ -114,7 +114,7 @@ export default function CompsIndex() {
   const exportDisabled = sorted.length === 0;
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6 lg:h-screen lg:max-h-screen lg:overflow-hidden">
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
       <header className="flex items-end justify-between gap-4 border-b pb-4">
         <div className="flex items-end gap-6">
           <div className="flex flex-col">
@@ -205,9 +205,9 @@ export default function CompsIndex() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[280px,1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px,1fr]">
           <CompFilterSidebar comps={comps} filters={filters} onChange={setFilters} />
-          <div className="flex flex-col gap-4 lg:min-h-0">
+          <div className="flex flex-col gap-4">
             <CompSummaryStats summary={summary} total={comps.length} />
             {selectedIds.length > 0 && (
               <div className="flex items-center justify-between rounded-md border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/5 px-3 py-2 text-xs">

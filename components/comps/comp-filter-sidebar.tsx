@@ -35,7 +35,7 @@ export function CompFilterSidebar({ comps, filters, onChange }: Props) {
   const active = hasActiveFilters(filters);
 
   return (
-    <aside className="flex flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:rounded-md lg:border lg:bg-[var(--color-card)] lg:p-4">
+    <aside className="flex flex-col gap-4 lg:self-start lg:rounded-md lg:border lg:bg-[var(--color-card)] lg:p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
           Filter
