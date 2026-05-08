@@ -118,6 +118,9 @@ interface Actions {
   updateComp: (id: string, patch: Partial<Comp>) => void;
   deleteComp: (id: string) => void;
 
+  // Wipe all persisted + transient state back to first-load defaults.
+  resetAll: () => void;
+
   // Hold-NER (transient)
   holdNer: HoldNerState | null;
   setHoldNer: (state: HoldNerState | null) => void;
@@ -271,6 +274,14 @@ export const useAppStore = create<AppStore>()(
 
       setCompDraft: (compDraft) => set({ compDraft }),
       setCompareIds: (compareIds) => set({ compareIds }),
+
+      resetAll: () =>
+        set({
+          ...makeInitialState(),
+          holdNer: null,
+          compDraft: null,
+          compareIds: [],
+        }),
     }),
     {
       name: "lease-calculator/v1",

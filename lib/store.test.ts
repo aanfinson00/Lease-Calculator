@@ -213,3 +213,67 @@ describe("useAppStore — deals slice (uploaded CSV)", () => {
     expect(parsed.state.deals[0].code).toBe("TestCode");
   });
 });
+
+describe("useAppStore — resetAll", () => {
+  const fakeDeal: Comp = {
+    id: "rs-1",
+    code: "ResetCode",
+    dealName: "Reset Deal",
+    tenantName: "Reset Tenant",
+    status: "EXECUTED",
+    commencementDate: "2026-01-01",
+    projectSF: 100_000,
+    buildingSF: 90_000,
+    leaseSF: 80_000,
+    baseRatePSF: 10,
+    escalation: 0.03,
+    leaseTermMonths: 60,
+    freeRentMonths: 3,
+    tiAllowancePSF: 5,
+    tiDurationMonths: 1,
+    lcLLRepPercent: 0.02,
+    lcTenantRepPercent: 0.04,
+    leaseStructure: "NNN",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    modifiedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("wipes deals, property name, and transient holdNer", () => {
+    const s0 = useAppStore.getState();
+    s0.setDeals([fakeDeal]);
+    s0.setPropertyName("Some Property");
+    s0.setHoldNer({
+      enabled: true,
+      targetNER: 9,
+      freeVar: "baseRatePSF",
+      scenarioId: s0.scenarios[0]!.id,
+      nerKind: "discounted",
+    });
+
+    useAppStore.getState().resetAll();
+
+    const after = useAppStore.getState();
+    expect(after.deals).toEqual([]);
+    expect(after.property.name).toBe("");
+    expect(after.holdNer).toBeNull();
+  });
+
+  it("restores the two-scenario seed (UW + Proposal) and a valid comparison", () => {
+    useAppStore.getState().resetAll();
+    const after = useAppStore.getState();
+    expect(after.scenarios).toHaveLength(2);
+    expect(after.scenarios[0]!.inputs.name).toBe("UW");
+    expect(after.scenarios[1]!.inputs.name).toBe("Proposal");
+    expect(after.comparison.aId).toBe(after.scenarios[0]!.id);
+    expect(after.comparison.bId).toBe(after.scenarios[1]!.id);
+  });
+
+  it("resets globals to their defaults", () => {
+    useAppStore.getState().updateGlobals({ discountRate: 0.15, projectBasisPSF: 999 });
+    useAppStore.getState().resetAll();
+    const g = useAppStore.getState().globals;
+    expect(g.discountRate).toBe(0.08);
+    expect(g.projectBasisPSF).toBe(140);
+    expect(g.horizonMonths).toBe(204);
+  });
+});
