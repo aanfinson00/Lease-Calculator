@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Database } from "lucide-react";
 import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
+import { ResetButton } from "@/components/reset-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/toaster";
@@ -75,6 +76,7 @@ export default function Home() {
               <Database className="size-4" /> Comps
             </Link>
             <ThemeToggle />
+            <ResetButton />
             <ExportPdfButton />
           </div>
         </div>

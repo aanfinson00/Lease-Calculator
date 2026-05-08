@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CompFilterSidebar } from "@/components/comps/comp-filter-sidebar";
 import { CompIndexTable } from "@/components/comps/comp-index-table";
 import { CompSummaryStats } from "@/components/comps/comp-summary";
+import { ResetButton } from "@/components/reset-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/toaster";
 import {
@@ -134,6 +135,7 @@ export default function CompsIndex() {
             <ArrowLeft className="size-4" /> Analyzer
           </Link>
           <ThemeToggle />
+          <ResetButton />
           <input
             ref={fileInputRef}
             type="file"
