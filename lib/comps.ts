@@ -241,7 +241,7 @@ export function validateComp(c: Comp): CompValidationError[] {
  *   Start Month (Date)-> commencementDate (ISO)
  *   Free Rent (months)-> freeRentMonths
  *   TIs               -> tiAllowancePSF
- *   LCs / LC Override -> split 1/3 LL + 2/3 Tenant Rep
+ *   LCs               -> split 1/3 LL + 2/3 Tenant Rep
  *   Status            -> status (LEASE -> EXECUTED, SPEC -> PROPOSAL,
  *                                RENEWAL -> RENEWAL; anything else
  *                                falls through to EXECUTED)
@@ -268,7 +268,6 @@ export function parseComps(csv: string): Comp[] {
   const cFreeRent = idx("Free Rent (months)");
   const cTI = idx("TIs");
   const cLC = idx("LCs");
-  const cLCOverride = idx("LC Override");
   const cStatus = idx("Status");
 
   const now = new Date().toISOString();
@@ -276,10 +275,8 @@ export function parseComps(csv: string): Comp[] {
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i]!.split(",");
     const lcs = num(cols[cLC]);
-    const lcOverride = num(cols[cLCOverride]);
-    const lcPercent = lcOverride > 0 ? lcOverride : lcs;
-    const llShare = lcPercent / 3;
-    const trShare = lcPercent - llShare;
+    const llShare = lcs / 3;
+    const trShare = lcs - llShare;
     comps.push({
       id: newCompId(),
       code: (cols[cCode] ?? "").trim(),

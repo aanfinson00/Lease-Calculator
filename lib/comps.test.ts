@@ -73,9 +73,9 @@ describe("parseComps", () => {
     expect(c.lcLLRepPercent + c.lcTenantRepPercent).toBe(0.06);
   });
 
-  it("uses LC Override when greater than zero", () => {
+  it("ignores LC Override and uses LCs even when override is non-zero", () => {
     const c = parseComps(`${HEADER}\n${ROW_OVERRIDE}`)[0]!;
-    expect(c.lcLLRepPercent + c.lcTenantRepPercent).toBeCloseTo(0.015, 10);
+    expect(c.lcLLRepPercent + c.lcTenantRepPercent).toBeCloseTo(0, 10);
   });
 
   it("assigns a unique id to each row", () => {

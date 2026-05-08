@@ -321,7 +321,7 @@ function UploadPrompt({ onClick, error }: { onClick: () => void; error: string |
         </div>
       )}
       <p className="px-1 text-center text-[10px] text-[var(--color-muted-foreground)]">
-        Required columns: Code · Deal Name · Tenant Name · Project SF · Building SF · Lease SF · Trended Rent · Rent Escalations · Lease Term · Start Month (Date) · Free Rent (months) · TIs · LCs · LC Override · Status
+        Required columns: Code · Deal Name · Tenant Name · Project SF · Building SF · Lease SF · Trended Rent · Rent Escalations · Lease Term · Start Month (Date) · Free Rent (months) · TIs · LCs · Status
       </p>
     </div>
   );
