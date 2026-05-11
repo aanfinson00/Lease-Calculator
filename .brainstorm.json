@@ -1,0 +1,137 @@
+{
+  "domain": "Browser-only industrial lease RFP analyzer that compares up to N scenarios on a Net Effective Rent (NER) basis, used by real-estate asset managers evaluating tenant proposals against an underwriting model",
+  "subsystems": [
+    {
+      "name": "rent-escalation",
+      "files": [
+        "lib/calc.ts",
+        "lib/types.ts"
+      ],
+      "patterns": [
+        "annualRateForYear",
+        "rentScheduleOverride",
+        "buildAnnualSchedule",
+        "annualRatePSF",
+        "escalation"
+      ]
+    },
+    {
+      "name": "lc-calc",
+      "files": [
+        "lib/calc.ts",
+        "lib/types.ts"
+      ],
+      "patterns": [
+        "calcLC",
+        "lcLLRep",
+        "lcTenantRep",
+        "lcCalculation",
+        "lcStructure",
+        "tiered"
+      ]
+    },
+    {
+      "name": "cashflow-grid",
+      "files": [
+        "lib/calc.ts",
+        "lib/types.ts"
+      ],
+      "patterns": [
+        "buildMonthlyGrid",
+        "MonthlyGridRow",
+        "freeRentPSF",
+        "netCFPSF",
+        "commencementOffset",
+        "tiDurationMonths"
+      ]
+    },
+    {
+      "name": "ner-pv",
+      "files": [
+        "lib/calc.ts",
+        "lib/solver.ts"
+      ],
+      "patterns": [
+        "calcUndiscountedNER",
+        "calcDiscountedNER",
+        "discountRate",
+        "undiscountedNER",
+        "discountedNER",
+        "yocYr1"
+      ]
+    },
+    {
+      "name": "hold-ner-solver",
+      "files": [
+        "lib/solver.ts",
+        "components/sensitivity/sensitivity-panel.tsx"
+      ],
+      "patterns": [
+        "solveFor",
+        "FreeVariable",
+        "targetNER",
+        "nerKind",
+        "defaultBounds",
+        "bisect"
+      ]
+    },
+    {
+      "name": "scenario-state",
+      "files": [
+        "lib/store.ts",
+        "components/scenario-bar.tsx"
+      ],
+      "patterns": [
+        "addScenario",
+        "duplicateScenario",
+        "updateInput",
+        "ScenarioRecord",
+        "compDraft",
+        "compareIds"
+      ]
+    },
+    {
+      "name": "comps-database",
+      "files": [
+        "lib/comps.ts",
+        "components/comps/comp-index-table.tsx"
+      ],
+      "patterns": [
+        "LeaseStatus",
+        "parseComps",
+        "filterComps",
+        "sortComps",
+        "summarizeComps",
+        "compsToCsv"
+      ]
+    },
+    {
+      "name": "pdf-export",
+      "files": [
+        "components/pdf/ComparisonDoc.tsx",
+        "components/pdf/export-button.tsx"
+      ],
+      "patterns": [
+        "ComparisonDoc",
+        "PdfWaterfall",
+        "fmtPctChange",
+        "StyleSheet",
+        "assumptionRows"
+      ]
+    },
+    {
+      "name": "waterfall-chart",
+      "files": [
+        "components/results/waterfall-chart.tsx",
+        "lib/types.ts"
+      ],
+      "patterns": [
+        "WaterfallChart",
+        "WaterfallComponents",
+        "stackId",
+        "BarChart",
+        "netCashFlow"
+      ]
+    }
+  ]
+}
