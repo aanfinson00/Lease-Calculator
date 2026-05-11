@@ -42,3 +42,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# brainstorm-daily.py outputs — regenerated locally by launchd nightly.
+# Committing them would cause merge conflicts with the Claude Code cloud agent.
+.brainstorm-state.json
+docs/BRAINSTORM_RAW.md
+docs/IDEAS_TO_IMPLEMENT*.md
+docs/DIFF.md
