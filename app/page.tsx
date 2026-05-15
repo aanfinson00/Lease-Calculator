@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Database } from "lucide-react";
 import { InputsPanel } from "@/components/inputs-panel";
 import { ExportPdfButton } from "@/components/pdf/export-button";
+import { ExportXlsxButton } from "@/components/xlsx/export-button";
 import { ResetButton } from "@/components/reset-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -77,6 +78,7 @@ export default function Home() {
             </Link>
             <ThemeToggle />
             <ResetButton />
+            <ExportXlsxButton />
             <ExportPdfButton />
           </div>
         </div>

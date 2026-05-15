@@ -396,25 +396,256 @@ export function ComparisonDoc({
           </View>
         </View>
 
-        {/* Footer */}
-        <View
-          style={{
-            position: "absolute",
-            bottom: 16,
-            left: 36,
-            right: 36,
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-          fixed
-        >
-          <Text style={styles.small}>{propertyName || "RFP Analysis"}</Text>
-          <Text
-            style={styles.small}
-            render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-          />
+        <PageFooter propertyName={propertyName} />
+      </Page>
+
+      {/* Page 2 — Annual rent schedules, side by side */}
+      <Page size="LETTER" style={styles.page}>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Annual Rent Schedule</Text>
+            <Text style={styles.subtitle}>
+              Year-by-year base rent — rate × monthsActive sums to total contracted rent
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.subtitle}>{propertyName || "RFP"}</Text>
+          </View>
         </View>
+        <AnnualScheduleTable
+          aName={aName}
+          aSchedule={aResults.schedule}
+          bName={bName}
+          bSchedule={bResults.schedule}
+        />
+        <PageFooter propertyName={propertyName} />
+      </Page>
+
+      {/* Page 3+ — Monthly cash flow grid, one scenario per page (240 columns
+          won't fit on a single page; stack the months vertically instead). */}
+      <Page size="LETTER" style={styles.page} orientation="landscape">
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Monthly Cash Flow · {aName}</Text>
+            <Text style={styles.subtitle}>
+              All values $/SF. NetCF = Base + Free + TI + LC (NER basis).
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.subtitle}>{propertyName || "RFP"}</Text>
+            <Text style={styles.subtitle}>{aInputs.leaseTermMonths} months</Text>
+          </View>
+        </View>
+        <MonthlyGridTable inputs={aInputs} results={aResults} />
+        <PageFooter propertyName={propertyName} />
+      </Page>
+
+      <Page size="LETTER" style={styles.page} orientation="landscape">
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Monthly Cash Flow · {bName}</Text>
+            <Text style={styles.subtitle}>
+              All values $/SF. NetCF = Base + Free + TI + LC (NER basis).
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.subtitle}>{propertyName || "RFP"}</Text>
+            <Text style={styles.subtitle}>{bInputs.leaseTermMonths} months</Text>
+          </View>
+        </View>
+        <MonthlyGridTable inputs={bInputs} results={bResults} />
+        <PageFooter propertyName={propertyName} />
       </Page>
     </Document>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helper subcomponents for the new pages
+// ---------------------------------------------------------------------------
+
+function PageFooter({ propertyName }: { propertyName: string }) {
+  return (
+    <View
+      style={{
+        position: "absolute",
+        bottom: 16,
+        left: 36,
+        right: 36,
+        flexDirection: "row",
+        justifyContent: "space-between",
+      }}
+      fixed
+    >
+      <Text style={styles.small}>{propertyName || "RFP Analysis"}</Text>
+      <Text
+        style={styles.small}
+        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
+      />
+    </View>
+  );
+}
+
+interface AnnualScheduleProps {
+  aName: string;
+  aSchedule: ScenarioResults["schedule"];
+  bName: string;
+  bSchedule: ScenarioResults["schedule"];
+}
+
+function AnnualScheduleTable({
+  aName,
+  aSchedule,
+  bName,
+  bSchedule,
+}: AnnualScheduleProps) {
+  const maxYears = Math.max(aSchedule.length, bSchedule.length);
+  const rows = Array.from({ length: maxYears }, (_, i) => i);
+
+  return (
+    <View style={styles.table}>
+      <View style={styles.rowHeader}>
+        <Text style={[styles.cellLabel, styles.bold]}>Year</Text>
+        <Text style={[styles.cellNum, styles.bold]}>{aName} Rate</Text>
+        <Text style={[styles.cellNum, styles.bold]}>{aName} Months</Text>
+        <Text style={[styles.cellNum, styles.bold]}>{bName} Rate</Text>
+        <Text style={[styles.cellNum, styles.bold]}>{bName} Months</Text>
+      </View>
+      {rows.map((i) => {
+        const aRow = aSchedule[i];
+        const bRow = bSchedule[i];
+        const year = (aRow ?? bRow)?.year ?? i + 1;
+        return (
+          <View key={i} style={styles.row} wrap={false}>
+            <Text style={styles.cellLabel}>Year {year}</Text>
+            <Text style={styles.cellNum}>
+              {aRow ? fmtCurrency(aRow.annualRatePSF, 2) : "--"}
+            </Text>
+            <Text style={styles.cellNum}>
+              {aRow ? fmtNumber(aRow.monthsActive, 0) : "--"}
+            </Text>
+            <Text style={styles.cellNum}>
+              {bRow ? fmtCurrency(bRow.annualRatePSF, 2) : "--"}
+            </Text>
+            <Text style={styles.cellNum}>
+              {bRow ? fmtNumber(bRow.monthsActive, 0) : "--"}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+interface MonthlyGridProps {
+  inputs: ScenarioInputs;
+  results: ScenarioResults;
+}
+
+/**
+ * Monthly grid for a single scenario. 240 columns won't fit on a page; we
+ * pivot so months run down the page (one row per month) instead of across.
+ * Caps at the lease span so we don't waste pages on zero rows beyond term.
+ */
+function MonthlyGridTable({ inputs, results }: MonthlyGridProps) {
+  const offset = Math.max(
+    0,
+    (new Date(inputs.leaseCommencement).getUTCFullYear() -
+      new Date(inputs.leaseExecutionDate).getUTCFullYear()) *
+      12 +
+      (new Date(inputs.leaseCommencement).getUTCMonth() -
+        new Date(inputs.leaseExecutionDate).getUTCMonth()),
+  );
+  const span = offset + inputs.leaseTermMonths;
+  const rows = results.grid.slice(0, span);
+
+  // Three columns of months — a typical 120-130 mo lease fits on one
+  // landscape LETTER page at 7pt font.
+  const perCol = Math.ceil(rows.length / 3);
+  const c1 = rows.slice(0, perCol);
+  const c2 = rows.slice(perCol, perCol * 2);
+  const c3 = rows.slice(perCol * 2);
+
+  return (
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      <View style={{ flex: 1 }}>
+        <MonthlyGridColumn rows={c1} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <MonthlyGridColumn rows={c2} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <MonthlyGridColumn rows={c3} />
+      </View>
+    </View>
+  );
+}
+
+function MonthlyGridColumn({ rows }: { rows: ScenarioResults["grid"] }) {
+  if (rows.length === 0) {
+    return <Text style={styles.small}>—</Text>;
+  }
+  return (
+    <View style={[styles.table, { fontSize: 7 }]}>
+      <View style={styles.rowHeader}>
+        <Text style={[styles.cellLabel, styles.bold, { flex: 0.7 }]}>M</Text>
+        <Text style={[styles.cellNum, styles.bold]}>Base</Text>
+        <Text style={[styles.cellNum, styles.bold]}>Free</Text>
+        <Text style={[styles.cellNum, styles.bold]}>TI</Text>
+        <Text style={[styles.cellNum, styles.bold]}>LC</Text>
+        <Text style={[styles.cellNum, styles.bold]}>Net</Text>
+      </View>
+      {rows.map((r) => (
+        <View key={r.month} style={[styles.row, { paddingVertical: 1 }]} wrap={false}>
+          <Text style={[styles.cellLabel, { flex: 0.7 }]}>{r.month}</Text>
+          <Text style={styles.cellNum}>{fmtCash(r.baseRentPSF)}</Text>
+          <Text
+            style={[
+              styles.cellNum,
+              r.freeRentPSF !== 0 ? styles.negative : styles.cellMuted,
+            ]}
+          >
+            {fmtCash(r.freeRentPSF)}
+          </Text>
+          <Text
+            style={[
+              styles.cellNum,
+              r.tiPSF !== 0 ? styles.negative : styles.cellMuted,
+            ]}
+          >
+            {fmtCash(r.tiPSF)}
+          </Text>
+          <Text
+            style={[
+              styles.cellNum,
+              r.lcPSF !== 0 ? styles.negative : styles.cellMuted,
+            ]}
+          >
+            {fmtCash(r.lcPSF)}
+          </Text>
+          <Text
+            style={[
+              styles.cellNum,
+              styles.bold,
+              r.netCFPSF > 0
+                ? styles.positive
+                : r.netCFPSF < 0
+                  ? styles.negative
+                  : {},
+            ]}
+          >
+            {fmtCash(r.netCFPSF)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Compact dollar format for monthly PSF (one or two dollars, two decimals). */
+function fmtCash(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return "--";
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  return `${sign}$${abs.toFixed(2)}`;
 }
