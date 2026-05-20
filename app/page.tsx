@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Database } from "lucide-react";
 import { InputsPanel } from "@/components/inputs-panel";
+import { ExportExcelButton } from "@/components/excel/export-button";
 import { ExportPdfButton } from "@/components/pdf/export-button";
 import { ResetButton } from "@/components/reset-button";
 import { PropertyHeader, ScenarioBar } from "@/components/scenario-bar";
@@ -77,6 +78,7 @@ export default function Home() {
             </Link>
             <ThemeToggle />
             <ResetButton />
+            <ExportExcelButton />
             <ExportPdfButton />
           </div>
         </div>
