@@ -70,6 +70,11 @@ export function FormattedNumberInput({
         if (parsed == null) return;
         onChange(percent ? parsed / 100 : parsed);
       }}
+      onKeyDown={(e) => {
+        // Enter confirms the edit — blur so onBlur's display switches back
+        // to the pretty/formatted view. Matches spreadsheet expectations.
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
       className={cn("h-8 px-2 text-sm", className)}
     />
   );

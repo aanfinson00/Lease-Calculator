@@ -184,6 +184,9 @@ export function CompForm({ initial }: Props) {
                 type="date"
                 value={comp.signedDate ?? ""}
                 onChange={(e) => set("signedDate", e.target.value || undefined)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
               />
             </Field>
             <Field label="Commencement date" required error={showErrors ? errorByField.get("commencementDate") : undefined}>
@@ -191,6 +194,9 @@ export function CompForm({ initial }: Props) {
                 type="date"
                 value={comp.commencementDate}
                 onChange={(e) => set("commencementDate", e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
               />
             </Field>
           </Section>

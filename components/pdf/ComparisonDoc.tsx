@@ -3,6 +3,7 @@
 import {
   Document,
   Page,
+  Path,
   StyleSheet,
   Svg,
   Rect,
@@ -10,7 +11,14 @@ import {
   View,
 } from "@react-pdf/renderer";
 import type { Globals, ScenarioInputs, ScenarioResults, WaterfallComponents } from "@/lib/types";
-import { fmtCurrency, fmtNumber, fmtPercent, fmtPSF } from "@/lib/format";
+import {
+  fmtCurrency,
+  fmtNumber,
+  fmtPercent,
+  fmtPSF,
+  fmtSignedCurrency,
+  fmtSignedPercent,
+} from "@/lib/format";
 
 // ---------------------------------------------------------------------------
 // Styles (react-pdf uses a flexbox-ish subset; values are points)
@@ -75,6 +83,14 @@ const styles = StyleSheet.create({
   },
   cellLabel: { flex: 1.6, paddingHorizontal: 4 },
   cellNum: { flex: 1, paddingHorizontal: 4, textAlign: "right" },
+  // cellNum's textAlign:right doesn't help a Views-with-children cell; use a
+  // flex row anchored to the right so the inline SVG triangle + label sit
+  // together where the column's numbers do.
+  deltaHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
   cellMuted: { color: "#475569" },
   bold: { fontFamily: "Helvetica-Bold" },
   positive: { color: "#047857" },
@@ -114,6 +130,17 @@ interface WaterfallProps {
 const PDF_PRIMARY = "#0b517f";
 const PDF_COST = "#b8492e";
 const PDF_SUCCESS = "#0b7643";
+
+// Helvetica (the only font @react-pdf bundles by default) is Latin-1 only,
+// so a literal Δ (U+0394) renders as a tofu glyph. Draw the triangle as a
+// tiny inline SVG instead — visually a delta, font-independent.
+function DeltaTri({ color = "#0f172a" }: { color?: string }) {
+  return (
+    <Svg width={6} height={7} style={{ marginRight: 2 }}>
+      <Path d="M3 0.5 L5.5 6.2 L0.5 6.2 Z" fill={color} />
+    </Svg>
+  );
+}
 
 function PdfWaterfall({ title, waterfall }: WaterfallProps) {
   const items = [
@@ -240,36 +267,43 @@ export function ComparisonDoc({
   bResults,
   globals,
 }: DocProps) {
+  // fmtDelta formats the nominal change (b - a) in the row's natural unit:
+  // PSF rows → "+$0.35", percent rows → "+0.19%" (percentage points).
   const headlineRows = [
     {
       label: "Undiscounted NER",
       a: aResults.undiscountedNER,
       b: bResults.undiscountedNER,
       fmt: (v: number) => fmtPSF(v, 2),
+      fmtDelta: (v: number) => fmtSignedCurrency(v, 2),
     },
     {
       label: "Discounted NER",
       a: aResults.discountedNER,
       b: bResults.discountedNER,
       fmt: (v: number) => fmtPSF(v, 2),
+      fmtDelta: (v: number) => fmtSignedCurrency(v, 2),
     },
     {
       label: "Yield on Cost (Yr 1)",
       a: aResults.yocYr1,
       b: bResults.yocYr1,
       fmt: (v: number) => fmtPercent(v, 2),
+      fmtDelta: (v: number) => fmtSignedPercent(v, 2),
     },
     {
       label: "Yield on Cost (Term)",
       a: aResults.yocTerm,
       b: bResults.yocTerm,
       fmt: (v: number) => fmtPercent(v, 2),
+      fmtDelta: (v: number) => fmtSignedPercent(v, 2),
     },
     {
       label: "Total Basis ($/SF)",
       a: aResults.totalBasisPSF,
       b: bResults.totalBasisPSF,
       fmt: (v: number) => fmtPSF(v, 2),
+      fmtDelta: (v: number) => fmtSignedCurrency(v, 2),
     },
   ];
 
@@ -336,22 +370,29 @@ export function ComparisonDoc({
             <Text style={[styles.cellLabel, styles.bold]}>Metric</Text>
             <Text style={[styles.cellNum, styles.bold]}>{aName}</Text>
             <Text style={[styles.cellNum, styles.bold]}>{bName}</Text>
-            <Text style={[styles.cellNum, styles.bold]}>Chg %</Text>
+            <View style={[styles.cellNum, styles.deltaHeader]}>
+              <DeltaTri />
+              <Text style={styles.bold}>%</Text>
+            </View>
+            <View style={[styles.cellNum, styles.deltaHeader]}>
+              <DeltaTri />
+              <Text style={styles.bold}>$</Text>
+            </View>
           </View>
           {headlineRows.map((r) => {
             const delta = r.b - r.a;
+            const deltaStyle =
+              delta > 0 ? styles.positive : delta < 0 ? styles.negative : {};
             return (
               <View key={r.label} style={styles.row}>
                 <Text style={styles.cellLabel}>{r.label}</Text>
                 <Text style={styles.cellNum}>{r.fmt(r.a)}</Text>
                 <Text style={[styles.cellNum, styles.bold]}>{r.fmt(r.b)}</Text>
-                <Text
-                  style={[
-                    styles.cellNum,
-                    delta > 0 ? styles.positive : delta < 0 ? styles.negative : {},
-                  ]}
-                >
+                <Text style={[styles.cellNum, deltaStyle]}>
                   {fmtPctChange(r.a, r.b)}
+                </Text>
+                <Text style={[styles.cellNum, deltaStyle]}>
+                  {r.fmtDelta(delta)}
                 </Text>
               </View>
             );

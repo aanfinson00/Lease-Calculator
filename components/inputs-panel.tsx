@@ -534,6 +534,9 @@ function Cell({ field, scenarioId, inputs, warning, diffStatus }: CellProps) {
           type="date"
           value={String(inputs[key] ?? "")}
           onChange={(e) => updateInput(scenarioId, key, e.target.value as never)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           className="h-8 px-2 text-sm"
         />
       </CellWrapper>
@@ -562,6 +565,15 @@ function Cell({ field, scenarioId, inputs, warning, diffStatus }: CellProps) {
  * value differs across the compared scenarios — green = best for the
  * landlord, red = worst, primary = differs but no clear "better" direction
  * (radios, dates, SF facts).
+ *
+ * The DOM shape is intentionally stable across warning / accent / neither
+ * states: an outer flex row wraps a `flex-1` child slot, and the warning
+ * icon is the only conditional sibling. Earlier versions branched the
+ * wrapper between `<>{children}</>`, `<div>{children}</div>`, and
+ * `<div><div>{children}</div><span/></div>`, which made React remount the
+ * input every time validation flipped a warning on/off (e.g. typing "1"
+ * into Term-months 130 briefly tripped the "< 12 months" warning and
+ * dropped focus on the first keystroke).
  */
 function CellWrapper({
   warning,
@@ -582,47 +594,45 @@ function CellWrapper({
           : undefined;
   // Negative left margin pulls the bordered cell back into its column so
   // the input's content (numbers etc.) stays in the same horizontal
-  // position whether or not a diff border is drawn. Without this, every
-  // diff'd cell would slide right by `border-width + padding`, breaking
-  // column alignment within the inputs grid.
+  // position whether or not a diff border is drawn.
   const accent = accentColor
     ? cn("-ml-[3px] border-l-2 pl-[1px]", accentColor)
     : undefined;
 
-  if (!warning) {
-    if (!accent) return <>{children}</>;
-    return <div className={cn("flex items-center", accent)}>{children}</div>;
-  }
-
-  const isWarn = warning.severity === "warn";
+  const isWarn = warning?.severity === "warn";
   const Icon = isWarn ? TriangleAlert : Info;
-  const colorClass = isWarn ? "text-[var(--color-cost)]" : "text-[var(--color-muted-foreground)]";
+  const warnColorClass = isWarn
+    ? "text-[var(--color-cost)]"
+    : "text-[var(--color-muted-foreground)]";
+
   return (
     <div className={cn("flex items-center gap-1", accent)}>
       <div className="flex-1">{children}</div>
-      <span className="group/help relative inline-flex items-center">
-        <button
-          type="button"
-          tabIndex={0}
-          aria-label={warning.message}
-          className={cn(
-            "inline-flex size-4 items-center justify-center rounded-full focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60",
-            colorClass,
-          )}
-        >
-          <Icon className="size-4" />
-        </button>
-        <span
-          role="tooltip"
-          className={cn(
-            "pointer-events-none invisible absolute right-0 top-full z-30 mt-1 w-64 rounded-md border bg-[var(--color-card)] p-2 text-[11px] leading-tight text-[var(--color-foreground)] shadow-md opacity-0 transition-opacity",
-            "group-hover/help:visible group-hover/help:opacity-100",
-            "group-focus-within/help:visible group-focus-within/help:opacity-100",
-          )}
-        >
-          {warning.message}
+      {warning && (
+        <span className="group/help relative inline-flex items-center">
+          <button
+            type="button"
+            tabIndex={0}
+            aria-label={warning.message}
+            className={cn(
+              "inline-flex size-4 items-center justify-center rounded-full focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60",
+              warnColorClass,
+            )}
+          >
+            <Icon className="size-4" />
+          </button>
+          <span
+            role="tooltip"
+            className={cn(
+              "pointer-events-none invisible absolute right-0 top-full z-30 mt-1 w-64 rounded-md border bg-[var(--color-card)] p-2 text-[11px] leading-tight text-[var(--color-foreground)] shadow-md opacity-0 transition-opacity",
+              "group-hover/help:visible group-hover/help:opacity-100",
+              "group-focus-within/help:visible group-focus-within/help:opacity-100",
+            )}
+          >
+            {warning.message}
+          </span>
         </span>
-      </span>
+      )}
     </div>
   );
 }

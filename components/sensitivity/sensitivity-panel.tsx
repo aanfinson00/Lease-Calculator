@@ -242,6 +242,9 @@ export function SensitivityPanel() {
                       targetNER: Number(e.target.value),
                     })
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
                 />
               </div>
               <div className="flex items-center gap-2">
