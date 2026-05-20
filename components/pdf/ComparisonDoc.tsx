@@ -139,16 +139,18 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
     { name: "Net CF", base: 0, value: waterfall.netCashFlow, color: PDF_SUCCESS },
   ];
 
-  // Chart geometry. Sized to fit a half-page column on LETTER (~248pt
-  // inner width inside the card padding) with a small breathing margin.
-  const W = 220;
-  const H = 110;
-  const padX = 14;
-  const padY = 12;
-  const innerW = W - padX * 2;
+  // Chart fills the inner card width. LETTER 612pt − page padding 72 − twoCol
+  // gap 12 → 264pt per column, minus the card's border + padding (1 + 16) ≈
+  // 247pt of inner space. W must equal the labels container width below so
+  // that each bar's slot lines up with the label centered beneath it.
+  const W = 244;
+  const H = 150;
+  const padY = 10;
   const innerH = H - padY * 2;
+  const slot = W / items.length;
+  const barInset = 4;
+  const barW = slot - barInset * 2;
   const max = Math.max(...items.map((it) => it.base + it.value), 1);
-  const barW = innerW / items.length - 6;
   const yFor = (v: number) => padY + innerH - (v / max) * innerH;
 
   return (
@@ -156,9 +158,9 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
       <Text style={styles.cardTitle}>{title}</Text>
       <Svg width={W} height={H}>
         {/* baseline */}
-        <Rect x={padX} y={padY + innerH} width={innerW} height={0.5} fill="#94a3b8" />
+        <Rect x={0} y={padY + innerH} width={W} height={0.5} fill="#94a3b8" />
         {items.map((it, i) => {
-          const x = padX + i * (innerW / items.length) + 3;
+          const x = i * slot + barInset;
           const top = yFor(it.base + it.value);
           const bottom = yFor(it.base);
           return (
@@ -173,9 +175,9 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
           );
         })}
       </Svg>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 4 }}>
+      <View style={{ flexDirection: "row", width: W, paddingTop: 4 }}>
         {items.map((it) => (
-          <View key={it.name} style={{ alignItems: "center", flex: 1 }}>
+          <View key={it.name} style={{ width: slot, alignItems: "center" }}>
             <Text style={styles.small}>{it.name}</Text>
             <Text style={[styles.small, { color: "#0f172a" }]}>
               {fmtCurrency(it.value, 1)}
@@ -223,7 +225,9 @@ const fmtDate = (iso: string | undefined): string => {
   if (!iso) return "--";
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  // "MMM-YY" — e.g., "May-26". toLocaleDateString gives "May 26"; swap the
+  // space for a hyphen.
+  return d.toLocaleDateString("en-US", { month: "short", year: "2-digit" }).replace(" ", "-");
 };
 
 export function ComparisonDoc({
@@ -304,11 +308,9 @@ export function ComparisonDoc({
     { label: "Total Basis ($/SF)", a: fmtCurrency(aResults.totalBasisPSF, 2), b: fmtCurrency(bResults.totalBasisPSF, 2) },
   ];
 
-  const today = new Date().toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const today = new Date()
+    .toLocaleDateString("en-US", { month: "short", year: "2-digit" })
+    .replace(" ", "-");
 
   return (
     <Document title={`${propertyName || "RFP"} Comparison`} author="RFP Analyzer">
