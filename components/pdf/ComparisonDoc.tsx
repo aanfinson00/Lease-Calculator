@@ -182,7 +182,10 @@ function PdfWaterfall({ title, waterfall }: WaterfallProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={{ marginBottom: 6 }}>
+        <Text style={[styles.cardTitle, { marginBottom: 0 }]}>{title}</Text>
+        <Text style={styles.small}>$/SF over lease term</Text>
+      </View>
       <Svg width={W} height={H}>
         {/* baseline */}
         <Rect x={0} y={padY + innerH} width={W} height={0.5} fill="#94a3b8" />
