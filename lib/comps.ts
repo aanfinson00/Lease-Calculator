@@ -366,6 +366,7 @@ export function compAsScenarioPatch(comp: Comp): Partial<ScenarioInputs> {
 export function computeCompSnapshot(comp: Comp, globals: Globals): CompNERSnapshot {
   const inputs: ScenarioInputs = {
     name: comp.code,
+    notes: "",
     projectSF: comp.projectSF,
     buildingSF: comp.buildingSF,
     proposedLeaseSF: comp.leaseSF,

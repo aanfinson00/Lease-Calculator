@@ -14,6 +14,7 @@ import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
 import { RentSchedule } from "@/components/results/rent-schedule";
+import { ScenarioDiffCard } from "@/components/results/scenario-diff-card";
 import { ValueCreationCard } from "@/components/results/value-creation-card";
 import { WaterfallChart } from "@/components/results/waterfall-chart";
 import { SensitivityPanel } from "@/components/sensitivity/sensitivity-panel";
@@ -96,6 +97,12 @@ export default function Home() {
                 aResults={aResults}
                 bName={b.inputs.name}
                 bResults={bResults}
+              />
+              <ScenarioDiffCard
+                aName={a.inputs.name}
+                aInputs={a.inputs}
+                bName={b.inputs.name}
+                bInputs={b.inputs}
               />
               <ValueCreationCard
                 aName={a.inputs.name}

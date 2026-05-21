@@ -53,6 +53,13 @@ export interface ScenarioInputs {
    */
   dealCode?: string;
 
+  /**
+   * Free-text notes about the scenario — assumptions, status, deal context.
+   * Metadata only; the calc engine never reads this. Optional; empty string
+   * is the default. Renders as a textarea in the Inputs panel.
+   */
+  notes?: string;
+
   // SF block
   projectSF: number;
   buildingSF: number;

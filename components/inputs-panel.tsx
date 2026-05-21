@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { TriangleAlert, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormattedNumberInput, type NumberFormat } from "@/components/ui/formatted-number-input";
@@ -230,6 +231,7 @@ export function InputsPanel() {
       </CardHeader>
       <CardContent className="flex flex-col divide-y">
         <DealAssumptions />
+        <NotesSection scenarios={scenarios} />
         {SECTIONS.map((section) => (
           <Section
             key={section.title}
@@ -349,6 +351,68 @@ function DealAssumptions() {
           />
         </Stack>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notes — free-text deal context per scenario. One textarea per scenario,
+// rendered side-by-side. Metadata only; the calc engine never reads this.
+// ---------------------------------------------------------------------------
+
+function NotesSection({
+  scenarios,
+}: {
+  scenarios: Array<{ id: string; name: string; inputs: ScenarioInputs }>;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+        Notes
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {scenarios.map((sc) => (
+          <NotesField key={sc.id} scenarioId={sc.id} name={sc.name} value={sc.inputs.notes ?? ""} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NotesField({
+  scenarioId,
+  name,
+  value,
+}: {
+  scenarioId: string;
+  name: string;
+  value: string;
+}) {
+  const updateInput = useAppStore((s) => s.updateInput);
+  // Buffer typing locally so each keystroke doesn't thrash the store /
+  // trigger a re-run of every scenario calc. Commit on blur.
+  const [buffer, setBuffer] = useState(value);
+  // Sync if the store value changes from elsewhere (load deal, undo, etc.).
+  useEffect(() => {
+    setBuffer(value);
+  }, [value]);
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-[var(--color-muted-foreground)]" htmlFor={`notes-${scenarioId}`}>
+        {name}
+      </label>
+      <textarea
+        id={`notes-${scenarioId}`}
+        value={buffer}
+        onChange={(e) => setBuffer(e.target.value)}
+        onBlur={() => {
+          if (buffer !== value) updateInput(scenarioId, "notes", buffer);
+        }}
+        placeholder="Capture assumptions, context, or status. Free text — won't affect the math."
+        rows={3}
+        className="w-full resize-y rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2.5 py-1.5 text-sm leading-snug text-[var(--color-foreground)] placeholder:text-[var(--color-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--color-ring)]"
+      />
     </div>
   );
 }

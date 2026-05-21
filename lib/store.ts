@@ -40,6 +40,7 @@ const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): Scena
   const today = new Date().toISOString().slice(0, 10);
   return {
     name,
+    notes: "",
     projectSF: 300_000,
     buildingSF: 300_000,
     proposedLeaseSF: 300_000,
@@ -296,7 +297,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 16,
+      version: 17,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -350,6 +351,9 @@ export const useAppStore = create<AppStore>()(
       //            the new TI-amortization / value-creation feature. With
       //            additionalTIPSF = 0 the calc collapses to the prior math,
       //            so headline numbers are preserved exactly.
+      // v16 → v17: scenarios gain optional `notes` (free-text deal context).
+      //            Empty string default; metadata only, never read by the
+      //            calc engine, so headline numbers are preserved exactly.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -533,6 +537,15 @@ export const useAppStore = create<AppStore>()(
               },
             }));
           }
+        }
+        if (state && version < 17 && state.scenarios) {
+          state.scenarios = state.scenarios.map((sc) => ({
+            ...sc,
+            inputs: {
+              ...sc.inputs,
+              notes: (sc.inputs as Partial<ScenarioInputs>).notes ?? "",
+            },
+          }));
         }
         return state as unknown as PersistedState;
       },
