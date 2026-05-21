@@ -14,6 +14,7 @@ import { AnnualSchedule } from "@/components/results/annual-schedule";
 import { CashFlowSchedule } from "@/components/results/cash-flow-schedule";
 import { HeadlineCard } from "@/components/results/headline-card";
 import { RentSchedule } from "@/components/results/rent-schedule";
+import { ValueCreationCard } from "@/components/results/value-creation-card";
 import { WaterfallChart } from "@/components/results/waterfall-chart";
 import { SensitivityPanel } from "@/components/sensitivity/sensitivity-panel";
 import { runScenario } from "@/lib/calc";
@@ -94,6 +95,14 @@ export default function Home() {
                 aName={a.inputs.name}
                 aResults={aResults}
                 bName={b.inputs.name}
+                bResults={bResults}
+              />
+              <ValueCreationCard
+                aName={a.inputs.name}
+                aInputs={a.inputs}
+                aResults={aResults}
+                bName={b.inputs.name}
+                bInputs={b.inputs}
                 bResults={bResults}
               />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

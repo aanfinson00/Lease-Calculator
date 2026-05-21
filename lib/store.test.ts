@@ -27,6 +27,8 @@ function resetStore() {
       discountRate: 0.08,
       projectBasisPSF: 140,
       horizonMonths: 204,
+      amortizationRate: 0.08,
+      capRate: 0.06,
     },
     deals: [],
     holdNer: null,

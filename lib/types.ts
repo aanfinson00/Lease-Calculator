@@ -28,6 +28,18 @@ export interface Globals {
   projectBasisPSF: number;
   /** Default lease horizon in months. Used when a scenario's term is shorter. */
   horizonMonths: number;
+  /**
+   * Annual amortization rate used to amortize additional TI into base rent,
+   * decimal (0.08 = 8%). The landlord's effective cost of capital for the
+   * additional spend. Monthly rests (rate / 12).
+   */
+  amortizationRate: number;
+  /**
+   * Market exit cap rate, decimal (0.06 = 6%). Used to capitalize the
+   * amortization rent uplift into a "value creation" number — the increase
+   * in asset value vs. forfeiting the additional TI and holding rate flat.
+   */
+  capRate: number;
 }
 
 export interface ScenarioInputs {
@@ -75,6 +87,14 @@ export interface ScenarioInputs {
   // Concessions
   /** TI allowance PSF, $. */
   tiAllowancePSF: number;
+  /**
+   * Additional TI PSF, $ — extra TI above the standard `tiAllowancePSF` that
+   * gets amortized into base rent at the global `amortizationRate`. Paid out
+   * upfront on the same schedule as `tiAllowancePSF`; the tenant pays it back
+   * via a constant monthly uplift to base rent in every paying month. Default
+   * 0 (no amortization deal).
+   */
+  additionalTIPSF: number;
   /** Free rent in months (always front-loaded — months 1..freeRentMonths). */
   freeRentMonths: number;
 
@@ -172,6 +192,23 @@ export interface ScenarioResults {
     lc: number;
     freeRentValue: number;
     ti: number;
+  };
+
+  /**
+   * TI amortization + value creation block. All zero when `additionalTIPSF`
+   * is 0 (i.e. no amortization deal). PSF values; absolute is × leaseSF.
+   */
+  amortization: {
+    /** Constant monthly rent uplift PSF, $ — PMT of the additional TI. */
+    monthlyUpliftPSF: number;
+    /** Annual rent uplift PSF (= monthlyUpliftPSF × 12), $. */
+    annualUpliftPSF: number;
+    /** Capitalized value of the annual uplift at `capRate`, $/SF. */
+    capitalizedUpliftPSF: number;
+    /** Value creation PSF = capitalizedUpliftPSF − additionalTIPSF, $/SF. */
+    valueCreationPSF: number;
+    /** Absolute value creation, $ (= valueCreationPSF × proposedLeaseSF). */
+    valueCreationAbsolute: number;
   };
 }
 

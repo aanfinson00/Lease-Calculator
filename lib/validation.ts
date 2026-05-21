@@ -80,6 +80,14 @@ export function validateScenario(inputs: ScenarioInputs): Warning[] {
     });
   }
 
+  if (inputs.additionalTIPSF < 0) {
+    out.push({
+      field: "additionalTIPSF",
+      severity: "warn",
+      message: "Additional TI is negative.",
+    });
+  }
+
   if (inputs.buildingSF > inputs.projectSF) {
     out.push({
       field: "buildingSF",
@@ -104,6 +112,18 @@ export function validateScenario(inputs: ScenarioInputs): Warning[] {
       field: "tiDurationMonths",
       severity: "info",
       message: "TI duration exceeds 24 months — verify the construction schedule.",
+    });
+  }
+
+  if (
+    inputs.additionalTIPSF > 0 &&
+    inputs.tiAllowancePSF > 0 &&
+    inputs.additionalTIPSF > inputs.tiAllowancePSF * 5
+  ) {
+    out.push({
+      field: "additionalTIPSF",
+      severity: "info",
+      message: `Additional TI ($${inputs.additionalTIPSF.toFixed(2)}) is more than 5× the standard allowance — verify.`,
     });
   }
 

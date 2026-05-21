@@ -75,6 +75,12 @@ const SECTIONS: SectionDef[] = [
         help: "Tenant improvement dollars per SF the landlord funds. Paid out evenly across the TI Duration window starting at lease execution.",
       },
       {
+        field: "additionalTIPSF",
+        label: "Add'l TI Amortized ($/SF)",
+        format: "currency",
+        help: "Extra TI above the standard allowance. The landlord amortizes it into base rent at the Amortization Rate (Deal Assumptions); raises base rent in paying months and total basis by this $/SF.",
+      },
+      {
         field: "tiDurationMonths",
         label: "TI Duration (mo)",
         format: "integer",
@@ -316,6 +322,28 @@ function DealAssumptions() {
           <FormattedNumberInput
             value={globals.discountRate}
             onChange={(v) => update({ discountRate: v ?? 0 })}
+            format="percent"
+            percent
+          />
+        </Stack>
+        <Stack
+          label="Amortization Rate (%)"
+          help="Landlord's annual cost of capital used to amortize additional TI into base rent. PMT formula, monthly rests. 0% = straight-line payback."
+        >
+          <FormattedNumberInput
+            value={globals.amortizationRate}
+            onChange={(v) => update({ amortizationRate: v ?? 0 })}
+            format="percent"
+            percent
+          />
+        </Stack>
+        <Stack
+          label="Cap Rate (%)"
+          help="Market exit cap rate. Used to capitalize the amortization rent uplift into the value-creation figure (capitalized uplift − additional TI given)."
+        >
+          <FormattedNumberInput
+            value={globals.capRate}
+            onChange={(v) => update({ capRate: v ?? 0 })}
             format="percent"
             percent
           />

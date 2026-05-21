@@ -376,6 +376,7 @@ export function computeCompSnapshot(comp: Comp, globals: Globals): CompNERSnapsh
     lcCalculation: "tiered",
     lcStructure: "split50",
     tiAllowancePSF: comp.tiAllowancePSF,
+    additionalTIPSF: 0,
     freeRentMonths: comp.freeRentMonths,
     leaseTermMonths: comp.leaseTermMonths,
     leaseCommencement: comp.commencementDate,

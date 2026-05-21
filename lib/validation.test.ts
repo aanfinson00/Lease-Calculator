@@ -14,6 +14,7 @@ const baseline: ScenarioInputs = {
   lcCalculation: "tiered",
   lcStructure: "split50",
   tiAllowancePSF: 10,
+  additionalTIPSF: 0,
   freeRentMonths: 6,
   leaseTermMonths: 130,
   leaseCommencement: "2025-01-01",
@@ -113,5 +114,27 @@ describe("validateScenario — soft infos", () => {
   it("flags very long lease (>240 mo)", () => {
     expect(validateScenario({ ...baseline, leaseTermMonths: 300 }))
       .toContainEqual(expect.objectContaining({ field: "leaseTermMonths", severity: "info" }));
+  });
+});
+
+describe("validateScenario — additional TI amortization", () => {
+  it("flags negative additional TI as a warn", () => {
+    expect(validateScenario({ ...baseline, additionalTIPSF: -5 }))
+      .toContainEqual(
+        expect.objectContaining({ field: "additionalTIPSF", severity: "warn" }),
+      );
+  });
+
+  it("flags additional TI > 5× standard allowance as an info", () => {
+    // baseline.tiAllowancePSF = 10, so > 50 triggers
+    expect(validateScenario({ ...baseline, additionalTIPSF: 75 }))
+      .toContainEqual(
+        expect.objectContaining({ field: "additionalTIPSF", severity: "info" }),
+      );
+  });
+
+  it("does not flag a normal additional-TI value", () => {
+    expect(validateScenario({ ...baseline, additionalTIPSF: 5 }))
+      .toEqual([]);
   });
 });

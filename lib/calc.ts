@@ -70,6 +70,37 @@ function annualRateForYear(inputs: ScenarioInputs, year: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. TI amortization uplift (PMT)
+// ---------------------------------------------------------------------------
+
+/**
+ * Constant monthly payment that amortizes `principalPSF` over `n` months at
+ * monthly rate `r = annualRate / 12`. Standard PMT formula; collapses to
+ * straight-line (principal / n) when annualRate = 0.
+ *
+ * Used to fold an "additional TI" allowance into base rent: the landlord
+ * gives the tenant `additionalTIPSF` of extra TI upfront, and the tenant
+ * repays it via a constant monthly uplift to base rent over the term at
+ * the landlord's amortization rate. Returns 0 when there's nothing to
+ * amortize (principal = 0 or term = 0).
+ */
+export function calcAmortizationUpliftPSF(
+  additionalTIPSF: number,
+  annualRate: number,
+  termMonths: number,
+): { monthlyPSF: number; annualPSF: number } {
+  if (additionalTIPSF <= 0 || termMonths <= 0) {
+    return { monthlyPSF: 0, annualPSF: 0 };
+  }
+  const r = annualRate / 12;
+  const monthlyPSF =
+    r === 0
+      ? additionalTIPSF / termMonths
+      : (additionalTIPSF * r) / (1 - Math.pow(1 + r, -termMonths));
+  return { monthlyPSF, annualPSF: monthlyPSF * 12 };
+}
+
+// ---------------------------------------------------------------------------
 // 2. Leasing commission (split-tier)
 // ---------------------------------------------------------------------------
 
@@ -184,7 +215,23 @@ export function buildMonthlyGrid(
   // 1-indexed grid month (from execution) where the lease commences.
   const commencementMonth = commencementOffset + 1;
 
-  const tiPerMonth = tiDuration > 0 ? -inputs.tiAllowancePSF / tiDuration : 0;
+  // TI outflow covers both the standard allowance and the additional TI
+  // (when an amortization deal is in play). The tenant repays the
+  // additional portion via the uplift below; the landlord still pays it
+  // out upfront on the same draw schedule as the standard allowance.
+  const totalTIOutflow = inputs.tiAllowancePSF + (inputs.additionalTIPSF ?? 0);
+  const tiPerMonth = tiDuration > 0 ? -totalTIOutflow / tiDuration : 0;
+
+  // Constant monthly uplift to base rent, paid only during in-lease,
+  // non-free months. Free rent abates contracted rent only — the uplift
+  // is treated as TI financing and isn't collected during free months, so
+  // the LL's effective return on the additional TI is below the amort
+  // rate when there's any free rent (as expected from a concession).
+  const { monthlyPSF: monthlyUpliftPSF } = calcAmortizationUpliftPSF(
+    inputs.additionalTIPSF ?? 0,
+    globals.amortizationRate ?? 0,
+    term,
+  );
 
   const grid: MonthlyGridRow[] = [];
   for (let m = 1; m <= horizon; m++) {
@@ -194,7 +241,8 @@ export function buildMonthlyGrid(
 
     const isFree =
       inLease && monthFromCommencement >= 1 && monthFromCommencement <= freeEnd;
-    const baseRentPSF = isFree ? 0 : annualRate / 12;
+    const isPaying = inLease && !isFree;
+    const baseRentPSF = isFree ? 0 : annualRate / 12 + (isPaying ? monthlyUpliftPSF : 0);
     const freeRentPSF = isFree ? -phantomRateForMonth(monthFromCommencement) / 12 : 0;
 
     // TI: spread evenly across tiDurationMonths starting at month 1 (execution).
@@ -343,15 +391,35 @@ export function runScenario(
   const undiscountedNER = calcUndiscountedNER(grid, span, term);
   const discountedNER = calcDiscountedNER(grid, globals.discountRate, span, term);
 
-  const totalBasisPSF = globals.projectBasisPSF + inputs.tiAllowancePSF + lcPSF;
-  const avgRatePSF = calcAvgRatePSF(schedule, term);
+  // Amortization uplift — annual $/SF added to the contracted rate when the
+  // landlord finances additional TI into base rent. Drives YoC numerators
+  // and the value-creation card; the grid already folded it into baseRent.
+  const additionalTIPSF = inputs.additionalTIPSF ?? 0;
+  const uplift = calcAmortizationUpliftPSF(
+    additionalTIPSF,
+    globals.amortizationRate ?? 0,
+    term,
+  );
+
+  const totalBasisPSF =
+    globals.projectBasisPSF + inputs.tiAllowancePSF + additionalTIPSF + lcPSF;
+  const avgRatePSF = calcAvgRatePSF(schedule, term) + uplift.annualPSF;
 
   // YoC Yr1 should reflect any per-year override on year 1, so pull the
   // rate from the schedule (which incorporates rentScheduleOverride[0])
-  // rather than `inputs.baseRatePSF` (the formula seed).
-  const yr1Rate = schedule.find((r) => r.year === 1)?.annualRatePSF ?? inputs.baseRatePSF;
+  // rather than `inputs.baseRatePSF` (the formula seed). The amortization
+  // uplift is added to express the steady-state rate the LL actually
+  // receives (paying months only — free rent doesn't carry the uplift).
+  const yr1Rate =
+    (schedule.find((r) => r.year === 1)?.annualRatePSF ?? inputs.baseRatePSF) +
+    uplift.annualPSF;
   const yocYr1 = totalBasisPSF > 0 ? yr1Rate / totalBasisPSF : 0;
   const yocTerm = totalBasisPSF > 0 ? avgRatePSF / totalBasisPSF : 0;
+
+  const capRate = globals.capRate ?? 0;
+  const capitalizedUpliftPSF = capRate > 0 ? uplift.annualPSF / capRate : 0;
+  const valueCreationPSF = capitalizedUpliftPSF - additionalTIPSF;
+  const valueCreationAbsolute = valueCreationPSF * inputs.proposedLeaseSF;
 
   const baseRent = sumColumn(grid, span, "baseRentPSF");
   const freeRent = sumColumn(grid, span, "freeRentPSF"); // negative
@@ -373,13 +441,20 @@ export function runScenario(
     totals: {
       lcPSF,
       freeRentValuePSF: -freeRent, // make the concession value positive
-      tiPSF: inputs.tiAllowancePSF,
+      tiPSF: inputs.tiAllowancePSF + additionalTIPSF,
       avgRatePSF,
     },
     totalsAbsolute: {
       lc: lcPSF * inputs.proposedLeaseSF,
       freeRentValue: -freeRent * inputs.proposedLeaseSF,
-      ti: inputs.tiAllowancePSF * inputs.proposedLeaseSF,
+      ti: (inputs.tiAllowancePSF + additionalTIPSF) * inputs.proposedLeaseSF,
+    },
+    amortization: {
+      monthlyUpliftPSF: uplift.monthlyPSF,
+      annualUpliftPSF: uplift.annualPSF,
+      capitalizedUpliftPSF,
+      valueCreationPSF,
+      valueCreationAbsolute,
     },
   };
 }

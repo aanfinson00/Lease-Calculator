@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAnnualSchedule,
+  calcAmortizationUpliftPSF,
   calcAvgRatePSF,
   calcDiscountedNER,
   calcLC,
@@ -15,6 +16,8 @@ const makeGlobals = (overrides: Partial<Globals> = {}): Globals => ({
   discountRate: 0.08,
   projectBasisPSF: 140,
   horizonMonths: 204,
+  amortizationRate: 0.08,
+  capRate: 0.06,
   ...overrides,
 });
 
@@ -33,6 +36,7 @@ const proposalInputs: ScenarioInputs = {
   lcCalculation: "tiered",
   lcStructure: "upfront",
   tiAllowancePSF: 10,
+  additionalTIPSF: 0,
   freeRentMonths: 6,
   leaseTermMonths: 130,
   leaseCommencement: "2025-01-01",
@@ -54,12 +58,121 @@ const uwInputs: ScenarioInputs = {
   lcCalculation: "tiered",
   lcStructure: "upfront",
   tiAllowancePSF: 5,
+  additionalTIPSF: 0,
   freeRentMonths: 4,
   leaseTermMonths: 125,
   leaseCommencement: "2025-01-01",
   leaseExecutionDate: "2025-01-01",
   tiDurationMonths: 1,
 };
+
+// ------------------------------------------------------------------------
+// calcAmortizationUpliftPSF — PMT formula
+// ------------------------------------------------------------------------
+
+describe("calcAmortizationUpliftPSF", () => {
+  it("returns 0 when there's nothing to amortize", () => {
+    expect(calcAmortizationUpliftPSF(0, 0.08, 130)).toEqual({
+      monthlyPSF: 0,
+      annualPSF: 0,
+    });
+    expect(calcAmortizationUpliftPSF(5, 0.08, 0)).toEqual({
+      monthlyPSF: 0,
+      annualPSF: 0,
+    });
+  });
+
+  it("PMT formula: $5/SF at 8% over 130 mo ≈ $0.0576/mo PSF", () => {
+    const u = calcAmortizationUpliftPSF(5, 0.08, 130);
+    // Spreadsheet: =PMT(0.08/12, 130, -5) ≈ 0.05763
+    expect(u.monthlyPSF).toBeCloseTo(0.0576264, 5);
+    expect(u.annualPSF).toBeCloseTo(0.0576264 * 12, 5);
+  });
+
+  it("rate=0 collapses to straight-line", () => {
+    const u = calcAmortizationUpliftPSF(10, 0, 120);
+    expect(u.monthlyPSF).toBeCloseTo(10 / 120, 10);
+    expect(u.annualPSF).toBeCloseTo(1, 10);
+  });
+});
+
+// ------------------------------------------------------------------------
+// runScenario — TI amortization integration & value creation
+// ------------------------------------------------------------------------
+
+describe("runScenario with additional TI amortized into base rent", () => {
+  const globals = makeGlobals({ amortizationRate: 0.08, capRate: 0.06 });
+
+  it("additionalTIPSF=0 produces results identical to no-amortization baseline", () => {
+    const baseline = runScenario(proposalInputs, globals);
+    const withZero = runScenario({ ...proposalInputs, additionalTIPSF: 0 }, globals);
+    expect(withZero.undiscountedNER).toBe(baseline.undiscountedNER);
+    expect(withZero.discountedNER).toBe(baseline.discountedNER);
+    expect(withZero.yocYr1).toBe(baseline.yocYr1);
+    expect(withZero.yocTerm).toBe(baseline.yocTerm);
+    expect(withZero.totalBasisPSF).toBe(baseline.totalBasisPSF);
+    expect(withZero.amortization.valueCreationPSF).toBe(0);
+    expect(withZero.amortization.valueCreationAbsolute).toBe(0);
+  });
+
+  it("turning amortization on raises NER, basis, and YoC (and produces positive value creation when amort > cap)", () => {
+    const baseline = runScenario(proposalInputs, globals);
+    const withAmort = runScenario(
+      { ...proposalInputs, additionalTIPSF: 5 },
+      globals,
+    );
+    expect(withAmort.undiscountedNER).toBeGreaterThan(baseline.undiscountedNER);
+    expect(withAmort.totalBasisPSF).toBeCloseTo(baseline.totalBasisPSF + 5, 6);
+    expect(withAmort.yocYr1).toBeGreaterThan(baseline.yocYr1);
+    expect(withAmort.amortization.annualUpliftPSF).toBeGreaterThan(0);
+    expect(withAmort.amortization.valueCreationPSF).toBeGreaterThan(0);
+  });
+
+  it("value creation matches the closed-form: capitalizedUplift − additionalTI, × leaseSF", () => {
+    const inputs = { ...proposalInputs, additionalTIPSF: 5 };
+    const r = runScenario(inputs, globals);
+    const u = calcAmortizationUpliftPSF(5, globals.amortizationRate, inputs.leaseTermMonths);
+    const expectedCap = u.annualPSF / globals.capRate;
+    const expectedPSF = expectedCap - 5;
+    expect(r.amortization.capitalizedUpliftPSF).toBeCloseTo(expectedCap, 8);
+    expect(r.amortization.valueCreationPSF).toBeCloseTo(expectedPSF, 8);
+    expect(r.amortization.valueCreationAbsolute).toBeCloseTo(
+      expectedPSF * inputs.proposedLeaseSF,
+      4,
+    );
+  });
+
+  it("capRate=0 leaves value-creation absolute = -additionalTI × leaseSF (no capitalization)", () => {
+    const r = runScenario(
+      { ...proposalInputs, additionalTIPSF: 5 },
+      makeGlobals({ capRate: 0 }),
+    );
+    expect(r.amortization.capitalizedUpliftPSF).toBe(0);
+    expect(r.amortization.valueCreationPSF).toBeCloseTo(-5, 8);
+  });
+
+  it("perpetuity shortcut always creates value when uplift > 0 (rent uplift treated as perpetual)", () => {
+    // The perpetuity shortcut (annualUplift / capRate) is a standard CRE
+    // approximation — it assumes the rent uplift continues forever, which
+    // overstates the true term-bound NPV. Confirmed: even when amort = cap,
+    // value creation stays positive because the LL collects the principal
+    // back via PMT AND the uplift gets capitalized into perpetuity.
+    const r = runScenario(
+      { ...proposalInputs, additionalTIPSF: 5 },
+      makeGlobals({ amortizationRate: 0.06, capRate: 0.06 }),
+    );
+    expect(r.amortization.valueCreationPSF).toBeGreaterThan(5);
+  });
+
+  it("LC is unaffected by additional TI (financing isn't commissionable)", () => {
+    const baseline = runScenario(proposalInputs, globals);
+    const withAmort = runScenario(
+      { ...proposalInputs, additionalTIPSF: 7.5 },
+      globals,
+    );
+    expect(withAmort.totals.lcPSF).toBe(baseline.totals.lcPSF);
+  });
+});
 
 // ------------------------------------------------------------------------
 // buildAnnualSchedule

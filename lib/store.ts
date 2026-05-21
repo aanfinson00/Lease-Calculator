@@ -31,6 +31,8 @@ const DEFAULT_GLOBALS: Globals = {
   discountRate: 0.08,
   projectBasisPSF: 140,
   horizonMonths: 204,
+  amortizationRate: 0.08,
+  capRate: 0.06,
 };
 
 /** Reasonable starting inputs — based on spec §12. User edits via the UI. */
@@ -48,6 +50,7 @@ const seedInputs = (name: string, override: Partial<ScenarioInputs> = {}): Scena
     lcCalculation: "tiered",
     lcStructure: "split50",
     tiAllowancePSF: 5,
+    additionalTIPSF: 0,
     freeRentMonths: 4,
     leaseTermMonths: 125,
     leaseCommencement: today,
@@ -293,7 +296,7 @@ export const useAppStore = create<AppStore>()(
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 15,
+      version: 16,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -342,6 +345,11 @@ export const useAppStore = create<AppStore>()(
       //            into a single projectBasisPSF (sum). Per user feedback
       //            the three-way split was friction without payoff — most
       //            asset managers carry one rolled-up basis number.
+      // v15 → v16: scenarios gain additionalTIPSF (default 0 — no amort deal).
+      //            Globals gain amortizationRate (0.08) + capRate (0.06) for
+      //            the new TI-amortization / value-creation feature. With
+      //            additionalTIPSF = 0 the calc collapses to the prior math,
+      //            so headline numbers are preserved exactly.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -508,6 +516,23 @@ export const useAppStore = create<AppStore>()(
           delete g.landCostPSF;
           delete g.shellCostPSF;
           delete g.softCostsPSF;
+        }
+        if (state && version < 16) {
+          if (state.globals) {
+            const g = state.globals as unknown as Record<string, unknown>;
+            if (typeof g.amortizationRate !== "number") g.amortizationRate = 0.08;
+            if (typeof g.capRate !== "number") g.capRate = 0.06;
+          }
+          if (state.scenarios) {
+            state.scenarios = state.scenarios.map((sc) => ({
+              ...sc,
+              inputs: {
+                ...sc.inputs,
+                additionalTIPSF:
+                  (sc.inputs as Partial<ScenarioInputs>).additionalTIPSF ?? 0,
+              },
+            }));
+          }
         }
         return state as unknown as PersistedState;
       },

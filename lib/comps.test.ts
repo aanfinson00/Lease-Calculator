@@ -403,6 +403,7 @@ describe("scenarioToComp", () => {
     lcCalculation: "tiered",
     lcStructure: "split50",
     tiAllowancePSF: 7,
+    additionalTIPSF: 0,
     freeRentMonths: 4,
     leaseTermMonths: 84,
     leaseCommencement: "2026-06-01",
@@ -413,6 +414,8 @@ describe("scenarioToComp", () => {
     discountRate: 0.08,
     projectBasisPSF: 140,
     horizonMonths: 204,
+    amortizationRate: 0.08,
+    capRate: 0.06,
   };
 
   it("copies the scenario's economics into the draft", () => {

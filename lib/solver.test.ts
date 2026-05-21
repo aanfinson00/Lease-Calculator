@@ -7,6 +7,8 @@ const baseGlobals: Globals = {
   discountRate: 0.08,
   projectBasisPSF: 140,
   horizonMonths: 204,
+  amortizationRate: 0.08,
+  capRate: 0.06,
 };
 
 const baseInputs: ScenarioInputs = {
@@ -21,6 +23,7 @@ const baseInputs: ScenarioInputs = {
   lcCalculation: "tiered",
   lcStructure: "upfront",
   tiAllowancePSF: 10,
+  additionalTIPSF: 0,
   freeRentMonths: 6,
   leaseTermMonths: 130,
   leaseCommencement: "2025-01-01",
