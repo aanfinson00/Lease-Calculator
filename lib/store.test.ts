@@ -20,9 +20,11 @@ function resetStore() {
   const proposalId = useAppStore.getState().addScenario("Proposal");
   useAppStore.getState().setComparisonA(survivorId);
   useAppStore.getState().setComparisonB(proposalId);
-  // Reset transient slice + property + globals + deals.
+  // Reset transient slice + property registry + globals + deals.
+  const seedPropId = "test-prop";
   useAppStore.setState({
-    property: { name: "" },
+    properties: [{ id: seedPropId, name: "" }],
+    activePropertyId: seedPropId,
     globals: {
       discountRate: 0.08,
       projectBasisPSF: 140,
@@ -114,9 +116,38 @@ describe("useAppStore — input updates", () => {
     expect(g.projectBasisPSF).toBe(140); // unchanged
   });
 
-  it("setPropertyName works", () => {
-    useAppStore.getState().setPropertyName("123 Logistics Way");
-    expect(useAppStore.getState().property.name).toBe("123 Logistics Way");
+  it("renaming the active property persists via updateProperty", () => {
+    const s = useAppStore.getState();
+    const activeId = s.activePropertyId!;
+    s.updateProperty(activeId, { name: "123 Logistics Way" });
+    const active = useAppStore.getState().properties.find((p) => p.id === activeId);
+    expect(active?.name).toBe("123 Logistics Way");
+  });
+
+  it("addProperty creates a new entry and activates it", () => {
+    const s = useAppStore.getState();
+    const before = s.properties.length;
+    const newId = s.addProperty("Champions Crossing");
+    const after = useAppStore.getState();
+    expect(after.properties).toHaveLength(before + 1);
+    expect(after.activePropertyId).toBe(newId);
+    expect(after.properties.find((p) => p.id === newId)?.name).toBe("Champions Crossing");
+  });
+
+  it("removeProperty refuses to empty the registry but works otherwise", () => {
+    const s = useAppStore.getState();
+    const newId = s.addProperty("Throwaway");
+    const beforeRemoval = useAppStore.getState().properties.length;
+    s.removeProperty(newId);
+    expect(useAppStore.getState().properties.length).toBe(beforeRemoval - 1);
+    // Now drain to one and try removing it — should be a no-op.
+    while (useAppStore.getState().properties.length > 1) {
+      const id = useAppStore.getState().properties[1]!.id;
+      useAppStore.getState().removeProperty(id);
+    }
+    const onlyId = useAppStore.getState().properties[0]!.id;
+    useAppStore.getState().removeProperty(onlyId);
+    expect(useAppStore.getState().properties).toHaveLength(1);
   });
 });
 
@@ -150,11 +181,14 @@ describe("useAppStore — Hold-NER (transient)", () => {
 describe("useAppStore — persistence", () => {
   it("persists to localStorage under the expected key", () => {
     const s = useAppStore.getState();
-    s.setPropertyName("Persistence Probe");
+    s.updateProperty(s.activePropertyId!, { name: "Persistence Probe" });
     const raw = localStorage.getItem("lease-calculator/v1");
     expect(raw).not.toBeNull();
     const parsed = JSON.parse(raw!);
-    expect(parsed.state.property.name).toBe("Persistence Probe");
+    const persistedActive = parsed.state.properties.find(
+      (p: { id: string; name: string }) => p.id === parsed.state.activePropertyId,
+    );
+    expect(persistedActive?.name).toBe("Persistence Probe");
   });
 
   it("does NOT persist holdNer (transient slice)", () => {
@@ -240,10 +274,10 @@ describe("useAppStore — resetAll", () => {
     modifiedAt: "2026-01-01T00:00:00.000Z",
   };
 
-  it("wipes deals, property name, and transient holdNer", () => {
+  it("wipes deals, property registry, and transient holdNer", () => {
     const s0 = useAppStore.getState();
     s0.setDeals([fakeDeal]);
-    s0.setPropertyName("Some Property");
+    s0.updateProperty(s0.activePropertyId!, { name: "Some Property" });
     s0.setHoldNer({
       enabled: true,
       targetNER: 9,
@@ -256,7 +290,9 @@ describe("useAppStore — resetAll", () => {
 
     const after = useAppStore.getState();
     expect(after.deals).toEqual([]);
-    expect(after.property.name).toBe("");
+    expect(after.properties).toHaveLength(1);
+    expect(after.properties[0]!.name).toBe("");
+    expect(after.activePropertyId).toBe(after.properties[0]!.id);
     expect(after.holdNer).toBeNull();
   });
 

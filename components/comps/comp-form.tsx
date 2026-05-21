@@ -278,6 +278,21 @@ export function CompForm({ initial }: Props) {
             </Field>
           </Section>
 
+          <Section title="Tags">
+            <Field label="Properties" wide>
+              <PropertyTagsField
+                value={comp.propertyTags ?? []}
+                onChange={(v) => set("propertyTags", v)}
+              />
+            </Field>
+            <Field label="Space tags" wide>
+              <SpaceTagsField
+                value={comp.spaceTags ?? []}
+                onChange={(v) => set("spaceTags", v)}
+              />
+            </Field>
+          </Section>
+
           <Section title="Economics">
             <Field label="Base rate ($/SF)" required error={showErrors ? errorByField.get("baseRatePSF") : undefined}>
               <FormattedNumberInput
@@ -443,6 +458,163 @@ function Field({
       </Label>
       {children}
       {error && <span className="text-[11px] text-[var(--color-destructive)]">{error}</span>}
+    </div>
+  );
+}
+
+/**
+ * Multi-select chips for tagging a comp to one or more properties in the
+ * registry. Clicking a property toggles it; the visual state is the chip
+ * filled (selected) or outlined (not selected).
+ */
+function PropertyTagsField({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const properties = useAppStore((s) => s.properties);
+  if (properties.length === 0) {
+    return (
+      <span className="text-xs text-[var(--color-muted-foreground)]">
+        No properties yet — add one from the analyzer header.
+      </span>
+    );
+  }
+  const selected = new Set(value);
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(Array.from(next));
+  };
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {properties.map((p) => {
+        const isOn = selected.has(p.id);
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => toggle(p.id)}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition",
+              isOn
+                ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
+                : "border-[var(--color-border)] text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]",
+            )}
+          >
+            {p.name || "Untitled property"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Free-text chip input for space tags ("shallow-bay TX 100-300k SF",
+ * "cold-storage"). Press Enter or comma to commit a tag; click the ✕ on
+ * an existing chip to remove. Existing tags across all comps in the
+ * store are offered as autosuggest below the input.
+ */
+function SpaceTagsField({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const allComps = useAppStore((s) => s.deals);
+  const [buffer, setBuffer] = useState("");
+
+  const allTagsSorted = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of allComps) {
+      for (const t of c.spaceTags ?? []) {
+        const k = t.toLowerCase().trim();
+        if (k && !seen.has(k)) seen.set(k, t.trim());
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+  }, [allComps]);
+
+  const valueLC = useMemo(() => new Set(value.map((t) => t.toLowerCase())), [value]);
+  const suggestions = useMemo(() => {
+    const q = buffer.trim().toLowerCase();
+    if (!q) return [];
+    return allTagsSorted
+      .filter((t) => t.toLowerCase().includes(q) && !valueLC.has(t.toLowerCase()))
+      .slice(0, 6);
+  }, [allTagsSorted, buffer, valueLC]);
+
+  const commit = (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    if (valueLC.has(t.toLowerCase())) {
+      setBuffer("");
+      return;
+    }
+    onChange([...value, t]);
+    setBuffer("");
+  };
+
+  const remove = (idx: number) => {
+    const next = value.slice();
+    next.splice(idx, 1);
+    onChange(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-background)] px-2 py-1.5">
+        {value.map((t, idx) => (
+          <span
+            key={`${t}-${idx}`}
+            className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-xs text-[var(--color-accent-foreground)]"
+          >
+            {t}
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              aria-label={`Remove tag ${t}`}
+              className="text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]"
+            >
+              ✕
+            </button>
+          </span>
+        ))}
+        <input
+          value={buffer}
+          onChange={(e) => setBuffer(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              commit(buffer);
+            } else if (e.key === "Backspace" && buffer === "" && value.length > 0) {
+              remove(value.length - 1);
+            }
+          }}
+          onBlur={() => commit(buffer)}
+          placeholder={value.length === 0 ? "Add a tag, then Enter" : ""}
+          className="min-w-[8rem] flex-1 bg-transparent text-sm focus:outline-none"
+        />
+      </div>
+      {suggestions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => commit(s)}
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--color-border)] px-2 py-0.5 text-[11px] text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)]"
+            >
+              + {s}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

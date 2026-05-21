@@ -219,11 +219,38 @@ export interface ScenarioResults {
   };
 }
 
+/**
+ * A property the user is underwriting. Lightweight registry — the active
+ * property drives the property header on the analyzer page, and comps can
+ * be tagged to one or more properties via Comp.propertyTags. Optional
+ * attribute fields (market, subtype, etc.) are stored but not yet used
+ * for auto-matching — that's a follow-up.
+ */
+export interface Property {
+  /** Stable internal identifier; auto-generated. */
+  id: string;
+  name: string;
+  market?: string;
+  submarket?: string;
+  /** Free-text — values shared with Comp.propertySubtype but typed loosely
+   * here so the property registry doesn't import the comps enum. */
+  subtype?: string;
+  buildingClass?: string;
+  /** Inclusive SF range that should match against comp lease SF. */
+  leaseSFMin?: number;
+  leaseSFMax?: number;
+}
+
 /** The full app state — what gets persisted to localStorage. */
 export interface AppState {
-  property: {
-    name: string;
-  };
+  /**
+   * Property registry. v18+ shape; pre-v18 stored a single
+   * `property: { name: string }` which migrates into properties[0].
+   */
+  properties: Property[];
+  /** Which property is currently selected in the header. Null only if
+   * properties is empty (shouldn't happen in normal flow). */
+  activePropertyId: string | null;
   globals: Globals;
   scenarios: Array<{ id: string; inputs: ScenarioInputs }>;
   comparison: {

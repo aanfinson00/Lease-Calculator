@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookmarkPlus, Copy, Plus, Trash2 } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, Copy, Plus, Trash2 } from "lucide-react";
 import { DealPicker } from "@/components/deal-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,24 +129,101 @@ export function ScenarioBar() {
   );
 }
 
+/**
+ * Property header — editable name for the active property and a tiny
+ * popover switcher for picking between properties in the registry or
+ * adding a new one. Comps can be tagged to properties via the comps
+ * intake form, so renaming/adding here is foundational to that flow.
+ */
 export function PropertyHeader() {
-  const propertyName = useAppStore((s) => s.property.name);
-  const setPropertyName = useAppStore((s) => s.setPropertyName);
+  const properties = useAppStore((s) => s.properties);
+  const activeId = useAppStore((s) => s.activePropertyId);
+  const updateProperty = useAppStore((s) => s.updateProperty);
+  const setActive = useAppStore((s) => s.setActivePropertyId);
+  const addProperty = useAppStore((s) => s.addProperty);
+  const removeProperty = useAppStore((s) => s.removeProperty);
+
+  const active = properties.find((p) => p.id === activeId) ?? properties[0];
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
   return (
-    <div className="flex flex-col gap-0.5">
+    <div ref={ref} className="relative flex flex-col gap-0.5">
       <Label
         htmlFor="property-name"
         className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]"
       >
         Property
       </Label>
-      <Input
-        id="property-name"
-        value={propertyName}
-        onChange={(e) => setPropertyName(e.target.value)}
-        placeholder="Untitled property"
-        className="h-9 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60"
-      />
+      <div className="flex items-center gap-1">
+        <Input
+          id="property-name"
+          value={active?.name ?? ""}
+          onChange={(e) => active && updateProperty(active.id, { name: e.target.value })}
+          placeholder="Untitled property"
+          className="h-9 border-0 bg-transparent px-0 text-xl font-semibold shadow-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/60"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Switch property"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-muted-foreground)] hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]"
+        >
+          <ChevronDown className="size-4" />
+        </button>
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-md border border-[var(--color-border)] bg-[var(--color-popover)] p-1 text-sm shadow-md">
+          {properties.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setActive(p.id);
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--color-accent)]"
+            >
+              <span className="truncate">{p.name || "Untitled property"}</span>
+              {p.id === active?.id && <Check className="size-4 text-[var(--color-primary)]" />}
+            </button>
+          ))}
+          <div className="my-1 border-t border-[var(--color-border)]" />
+          <button
+            type="button"
+            onClick={() => {
+              addProperty();
+              setOpen(false);
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-[var(--color-accent)]"
+          >
+            <Plus className="size-4" />
+            <span>Add property</span>
+          </button>
+          {properties.length > 1 && active && (
+            <button
+              type="button"
+              onClick={() => {
+                removeProperty(active.id);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[var(--color-destructive)] hover:bg-[var(--color-accent)]"
+            >
+              <Trash2 className="size-4" />
+              <span>Remove “{active.name || "Untitled property"}”</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

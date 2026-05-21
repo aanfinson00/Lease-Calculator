@@ -129,6 +129,23 @@ export interface Comp {
   // -- Computed snapshot (cached on save; not the source of truth).
   ner?: CompNERSnapshot;
 
+  // -- Tags
+  /**
+   * IDs of properties this comp is tagged to (many-to-many). Lets the user
+   * mark a comp as a relevant data point for one or more underwriting
+   * properties. Powers the "filter to properties tagged to X" filter on
+   * the comps index, and will drive the headline-card overlay in a later
+   * phase. Optional; absent or empty means untagged.
+   */
+  propertyTags?: string[];
+  /**
+   * Free-text reusable tags ("shallow-bay TX 100-300k SF", "cold-storage",
+   * "credit tenant"). Cross-cuts properties — a tag can apply to many
+   * comps regardless of which properties they're associated with. The
+   * Comps page suggests existing tags as you type.
+   */
+  spaceTags?: string[];
+
   // -- Provenance
   dataSource?: DataSource;
   brokerName?: string;
@@ -176,6 +193,8 @@ export function defaultComp(): Comp {
     lcLLRepPercent: 0.03,
     lcTenantRepPercent: 0.06,
     leaseStructure: "NNN",
+    propertyTags: [],
+    spaceTags: [],
     createdAt: now,
     modifiedAt: now,
   };
@@ -447,6 +466,10 @@ export interface CompFilters {
   subtypes: PropertySubtype[];
   classes: BuildingClass[];
   markets: string[];
+  /** Property IDs to filter by — comp must be tagged to at least one. */
+  propertyTags: string[];
+  /** Space tags to filter by — comp must carry at least one (case-insensitive). */
+  spaceTags: string[];
   termMonths: { min?: number; max?: number };
   baseRatePSF: { min?: number; max?: number };
   leaseSF: { min?: number; max?: number };
@@ -458,6 +481,8 @@ export const emptyFilters = (): CompFilters => ({
   subtypes: [],
   classes: [],
   markets: [],
+  propertyTags: [],
+  spaceTags: [],
   termMonths: {},
   baseRatePSF: {},
   leaseSF: {},
@@ -470,6 +495,8 @@ export function hasActiveFilters(f: CompFilters): boolean {
     f.subtypes.length > 0 ||
     f.classes.length > 0 ||
     f.markets.length > 0 ||
+    f.propertyTags.length > 0 ||
+    f.spaceTags.length > 0 ||
     f.termMonths.min != null ||
     f.termMonths.max != null ||
     f.baseRatePSF.min != null ||
@@ -493,11 +520,36 @@ export function filterComps(comps: Comp[], f: CompFilters): Comp[] {
     if (f.subtypes.length > 0 && (!c.propertySubtype || !f.subtypes.includes(c.propertySubtype))) return false;
     if (f.classes.length > 0 && (!c.buildingClass || !f.classes.includes(c.buildingClass))) return false;
     if (f.markets.length > 0 && (!c.market || !f.markets.includes(c.market))) return false;
+    if (f.propertyTags.length > 0) {
+      const tags = c.propertyTags ?? [];
+      if (!tags.some((id) => f.propertyTags.includes(id))) return false;
+    }
+    if (f.spaceTags.length > 0) {
+      const tags = (c.spaceTags ?? []).map((t) => t.toLowerCase());
+      const needed = f.spaceTags.map((t) => t.toLowerCase());
+      if (!tags.some((t) => needed.includes(t))) return false;
+    }
     if (!inRange(c.leaseTermMonths, f.termMonths)) return false;
     if (!inRange(c.baseRatePSF, f.baseRatePSF)) return false;
     if (!inRange(c.leaseSF, f.leaseSF)) return false;
     return true;
   });
+}
+
+/**
+ * Distinct space tags across a comp list, case-normalized, sorted. Used to
+ * power the autosuggest in the chip input on the intake form and the
+ * filter dropdown on the comps index.
+ */
+export function allSpaceTags(comps: Comp[]): string[] {
+  const seen = new Map<string, string>(); // lowercase → original casing
+  for (const c of comps) {
+    for (const t of c.spaceTags ?? []) {
+      const k = t.toLowerCase().trim();
+      if (k && !seen.has(k)) seen.set(k, t.trim());
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
 }
 
 export type CompSortKey =

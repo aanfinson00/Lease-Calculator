@@ -268,6 +268,47 @@ describe("filterComps", () => {
   });
 });
 
+describe("filterComps · property + space tags", () => {
+  const tagged: Comp[] = [
+    baseComp({ id: "1", code: "T-1", propertyTags: ["champions"], spaceTags: ["shallow-bay TX"] }),
+    baseComp({ id: "2", code: "T-2", propertyTags: ["champions", "denton"], spaceTags: ["cold-storage"] }),
+    baseComp({ id: "3", code: "T-3", propertyTags: [], spaceTags: ["shallow-bay TX"] }),
+    baseComp({ id: "4", code: "T-4" /* no tags at all */ }),
+  ];
+
+  it("filters by propertyTags (comp must overlap at least one)", () => {
+    expect(
+      filterComps(tagged, { ...emptyFilters(), propertyTags: ["champions"] }).map((c) => c.code),
+    ).toEqual(["T-1", "T-2"]);
+    expect(
+      filterComps(tagged, { ...emptyFilters(), propertyTags: ["denton"] }).map((c) => c.code),
+    ).toEqual(["T-2"]);
+    expect(
+      filterComps(tagged, { ...emptyFilters(), propertyTags: ["champions", "denton"] }).map(
+        (c) => c.code,
+      ),
+    ).toEqual(["T-1", "T-2"]);
+  });
+
+  it("filters by spaceTags (case-insensitive, comp must carry at least one)", () => {
+    expect(
+      filterComps(tagged, { ...emptyFilters(), spaceTags: ["Shallow-Bay TX"] }).map((c) => c.code),
+    ).toEqual(["T-1", "T-3"]);
+    expect(
+      filterComps(tagged, { ...emptyFilters(), spaceTags: ["cold-storage"] }).map((c) => c.code),
+    ).toEqual(["T-2"]);
+  });
+
+  it("comp with no tags is hidden when either tag filter is active", () => {
+    expect(
+      filterComps(tagged, { ...emptyFilters(), propertyTags: ["champions"] }).find((c) => c.code === "T-4"),
+    ).toBeUndefined();
+    expect(
+      filterComps(tagged, { ...emptyFilters(), spaceTags: ["anything"] }).find((c) => c.code === "T-4"),
+    ).toBeUndefined();
+  });
+});
+
 describe("sortComps", () => {
   const corpus: Comp[] = [
     baseComp({ id: "1", code: "B", baseRatePSF: 10, leaseTermMonths: 60, status: "RENEWAL", lcLLRepPercent: 0.02, lcTenantRepPercent: 0.04, modifiedAt: "2026-01-01T00:00:00Z" }),

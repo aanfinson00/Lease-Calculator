@@ -9,6 +9,7 @@ import {
   BUILDING_CLASSES,
   LEASE_STATUSES,
   PROPERTY_SUBTYPES,
+  allSpaceTags,
   emptyFilters,
   hasActiveFilters,
   type BuildingClass,
@@ -17,6 +18,7 @@ import {
   type LeaseStatus,
   type PropertySubtype,
 } from "@/lib/comps";
+import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -31,6 +33,10 @@ export function CompFilterSidebar({ comps, filters, onChange }: Props) {
     for (const c of comps) if (c.market) set.add(c.market);
     return Array.from(set).sort();
   }, [comps]);
+
+  const properties = useAppStore((s) => s.properties);
+  const activePropertyId = useAppStore((s) => s.activePropertyId);
+  const spaceTagOptions = useMemo(() => allSpaceTags(comps), [comps]);
 
   const active = hasActiveFilters(filters);
 
@@ -97,6 +103,85 @@ export function CompFilterSidebar({ comps, filters, onChange }: Props) {
           onChange={(classes) => onChange({ ...filters, classes })}
         />
       </Section>
+
+      {properties.length > 0 && (
+        <Section label="Tagged to property">
+          <div className="flex flex-col gap-1">
+            {activePropertyId && (
+              <button
+                type="button"
+                onClick={() => {
+                  const isOn = filters.propertyTags.includes(activePropertyId);
+                  onChange({
+                    ...filters,
+                    propertyTags: isOn ? [] : [activePropertyId],
+                  });
+                }}
+                className={cn(
+                  "self-start rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                  filters.propertyTags.length === 1 &&
+                    filters.propertyTags[0] === activePropertyId
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                    : "border-[var(--color-border)] hover:bg-[var(--color-accent)]",
+                )}
+              >
+                Active property only
+              </button>
+            )}
+            <div className="flex max-h-32 flex-col gap-1 overflow-y-auto pr-1">
+              {properties.map((p) => {
+                const checked = filters.propertyTags.includes(p.id);
+                return (
+                  <label key={p.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        const next = checked
+                          ? filters.propertyTags.filter((x) => x !== p.id)
+                          : [...filters.propertyTags, p.id];
+                        onChange({ ...filters, propertyTags: next });
+                      }}
+                      className="size-3.5 accent-[var(--color-primary)]"
+                    />
+                    <span className="truncate">{p.name || "Untitled property"}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {spaceTagOptions.length > 0 && (
+        <Section label="Space tags">
+          <div className="flex flex-wrap gap-1">
+            {spaceTagOptions.map((t) => {
+              const isOn = filters.spaceTags.some((x) => x.toLowerCase() === t.toLowerCase());
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    const next = isOn
+                      ? filters.spaceTags.filter((x) => x.toLowerCase() !== t.toLowerCase())
+                      : [...filters.spaceTags, t];
+                    onChange({ ...filters, spaceTags: next });
+                  }}
+                  className={cn(
+                    "rounded-full border px-2 py-0.5 text-[11px] transition",
+                    isOn
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
+                      : "border-[var(--color-border)] hover:bg-[var(--color-accent)]",
+                  )}
+                >
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {markets.length > 0 && (
         <Section label="Market">

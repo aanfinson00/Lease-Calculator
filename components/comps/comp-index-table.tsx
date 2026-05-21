@@ -30,6 +30,7 @@ export function CompIndexTable({
   onSelectionChange,
 }: Props) {
   const deleteComp = useAppStore((s) => s.deleteComp);
+  const properties = useAppStore((s) => s.properties);
   const aId = useAppStore((s) => s.comparison.aId);
   const bId = useAppStore((s) => s.comparison.bId);
   const aName = useAppStore((s) => s.scenarios.find((sc) => sc.id === aId)?.inputs.name);
@@ -121,6 +122,7 @@ export function CompIndexTable({
               <td className="px-3 py-2">
                 <div className="font-medium">{c.dealName}</div>
                 <div className="text-[var(--color-muted-foreground)]">{c.tenantName}</div>
+                <TagChips comp={c} properties={properties} />
               </td>
               <td className="px-3 py-2">
                 {c.market ? (
@@ -269,5 +271,40 @@ function StatusBadge({ status }: { status: string }) {
     <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium uppercase", tone)}>
       {status}
     </span>
+  );
+}
+
+function TagChips({
+  comp,
+  properties,
+}: {
+  comp: Comp;
+  properties: { id: string; name: string }[];
+}) {
+  const propertyNames = (comp.propertyTags ?? [])
+    .map((id) => properties.find((p) => p.id === id)?.name || "")
+    .filter(Boolean);
+  const space = comp.spaceTags ?? [];
+  if (propertyNames.length === 0 && space.length === 0) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {propertyNames.map((n) => (
+        <span
+          key={`p-${n}`}
+          className="inline-flex items-center rounded-full bg-[var(--color-primary)]/10 px-1.5 py-0 text-[10px] text-[var(--color-primary)]"
+          title={`Tagged to ${n}`}
+        >
+          {n}
+        </span>
+      ))}
+      {space.map((t) => (
+        <span
+          key={`s-${t}`}
+          className="inline-flex items-center rounded-full bg-[var(--color-muted)] px-1.5 py-0 text-[10px] text-[var(--color-muted-foreground)]"
+        >
+          {t}
+        </span>
+      ))}
+    </div>
   );
 }

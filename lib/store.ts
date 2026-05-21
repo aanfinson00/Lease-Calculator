@@ -20,7 +20,7 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { newCompId, type Comp, type LeaseStatus } from "./comps";
-import type { Globals, ScenarioInputs } from "./types";
+import type { Globals, Property, ScenarioInputs } from "./types";
 import type { FreeVariable, NERKind } from "./solver";
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,10 @@ interface HoldNerState {
 }
 
 interface PersistedState {
-  property: { name: string };
+  /** Lightweight property registry. v18+ shape. */
+  properties: Property[];
+  /** ID of the currently selected property. Falls back to properties[0] if invalid. */
+  activePropertyId: string | null;
   globals: Globals;
   scenarios: ScenarioRecord[];
   comparison: { aId: string; bId: string };
@@ -100,8 +103,11 @@ interface PersistedState {
 }
 
 interface Actions {
-  // Property + globals
-  setPropertyName: (name: string) => void;
+  // Property registry (lightweight: id + name + optional attributes)
+  addProperty: (name?: string) => string;
+  updateProperty: (id: string, patch: Partial<Property>) => void;
+  removeProperty: (id: string) => void;
+  setActivePropertyId: (id: string) => void;
   updateGlobals: (patch: Partial<Globals>) => void;
 
   // Scenarios
@@ -160,13 +166,22 @@ function makeInitialState(): PersistedState {
       leaseTermMonths: 130,
     }),
   };
+  const firstProperty: Property = { id: newPropertyId(), name: "" };
   return {
-    property: { name: "" },
+    properties: [firstProperty],
+    activePropertyId: firstProperty.id,
     globals: DEFAULT_GLOBALS,
     deals: [],
     scenarios: [uw, proposal],
     comparison: { aId: uw.id, bId: proposal.id },
   };
+}
+
+function newPropertyId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `prop_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +196,30 @@ export const useAppStore = create<AppStore>()(
       compDraft: null,
       compareIds: [],
 
-      setPropertyName: (name) => set({ property: { name } }),
+      addProperty: (name = "Untitled property") => {
+        const id = newPropertyId();
+        set((s) => ({
+          properties: [...s.properties, { id, name }],
+          activePropertyId: id,
+        }));
+        return id;
+      },
+      updateProperty: (id, patch) =>
+        set((s) => ({
+          properties: s.properties.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
+      removeProperty: (id) =>
+        set((s) => {
+          if (s.properties.length <= 1) return s; // never empty the registry
+          const remaining = s.properties.filter((p) => p.id !== id);
+          const nextActive =
+            s.activePropertyId === id ? remaining[0]!.id : s.activePropertyId;
+          return { properties: remaining, activePropertyId: nextActive };
+        }),
+      setActivePropertyId: (id) =>
+        set((s) =>
+          s.properties.some((p) => p.id === id) ? { activePropertyId: id } : s,
+        ),
 
       updateGlobals: (patch) =>
         set((s) => ({ globals: { ...s.globals, ...patch } })),
@@ -291,13 +329,14 @@ export const useAppStore = create<AppStore>()(
       name: "lease-calculator/v1",
       // Persist all five data slices; holdNer stays in memory.
       partialize: (state) => ({
-        property: state.property,
+        properties: state.properties,
+        activePropertyId: state.activePropertyId,
         globals: state.globals,
         scenarios: state.scenarios,
         comparison: state.comparison,
         deals: state.deals,
       }),
-      version: 17,
+      version: 18,
       // v1 → v2: scenarios gain leaseExecutionDate (defaulted to commencement,
       //          which keeps the calc identical to before) and tiDurationMonths
       //          (= 1, the original single-lump TI behavior).
@@ -354,6 +393,10 @@ export const useAppStore = create<AppStore>()(
       // v16 → v17: scenarios gain optional `notes` (free-text deal context).
       //            Empty string default; metadata only, never read by the
       //            calc engine, so headline numbers are preserved exactly.
+      // v17 → v18: collapse the single `property: { name }` slice into a
+      //            real `properties[]` registry + `activePropertyId`.
+      //            Existing comps gain empty `propertyTags` / `spaceTags`
+      //            arrays so the new filter helpers don't trip on undefined.
       migrate: (persisted, version) => {
         const state = persisted as Partial<PersistedState> | undefined;
         if (state && version < 2 && state.scenarios) {
@@ -546,6 +589,31 @@ export const useAppStore = create<AppStore>()(
               notes: (sc.inputs as Partial<ScenarioInputs>).notes ?? "",
             },
           }));
+        }
+        if (state && version < 18) {
+          const legacy = state as unknown as Record<string, unknown> & {
+            property?: { name?: string };
+          };
+          // Convert the old single-property slice into a registry of one.
+          if (!Array.isArray((state as Partial<PersistedState>).properties)) {
+            const id = newPropertyId();
+            const name = typeof legacy.property?.name === "string" ? legacy.property.name : "";
+            (state as Partial<PersistedState>).properties = [{ id, name }];
+            (state as Partial<PersistedState>).activePropertyId = id;
+          }
+          delete legacy.property;
+          // Backfill empty tag arrays on existing comps.
+          if (Array.isArray(state.deals)) {
+            state.deals = state.deals.map((c) => ({
+              ...c,
+              propertyTags: Array.isArray((c as Partial<Comp>).propertyTags)
+                ? (c as Partial<Comp>).propertyTags!
+                : [],
+              spaceTags: Array.isArray((c as Partial<Comp>).spaceTags)
+                ? (c as Partial<Comp>).spaceTags!
+                : [],
+            }));
+          }
         }
         return state as unknown as PersistedState;
       },

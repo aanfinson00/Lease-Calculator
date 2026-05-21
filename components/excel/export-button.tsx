@@ -13,7 +13,9 @@ import { toast } from "@/lib/toast";
  * users only pay for the bundle if they click the button.
  */
 export function ExportExcelButton() {
-  const propertyName = useAppStore((s) => s.property.name);
+  const propertyName = useAppStore(
+    (s) => s.properties.find((p) => p.id === s.activePropertyId)?.name ?? "",
+  );
   const aId = useAppStore((s) => s.comparison.aId);
   const bId = useAppStore((s) => s.comparison.bId);
   const a = useAppStore((s) => s.scenarios.find((sc) => sc.id === aId));
